@@ -13,7 +13,7 @@ const server=read('./server.mjs');
 
 test('Android app declares installable home-screen widgets',()=>{
   assert.match(gradle,/applicationId = "com\.ykcnet\.lifetempo"/);
-  assert.match(gradle,/versionCode = 3/);
+  assert.match(gradle,/versionCode = 4/);
   assert.match(gradle,/LIFETEMPO_SIGNING_KEYSTORE/);
   assert.match(manifest,/android:allowBackup="false"/);
   assert.match(manifest,/TodayEventsWidgetProvider/);
@@ -36,6 +36,9 @@ test('widgets exist only as native home-screen components, not an in-app widget 
 
 test('Android shell serves only app assets and exposes a bounded widget snapshot bridge',()=>{
   assert.match(app,/WebViewAssetLoader/);
+  assert.match(app,/setWebChromeClient/);
+  assert.match(app,/onShowFileChooser/);
+  assert.match(app,/FileChooserParams\.parseResult/);
   assert.match(app,/LifeTempoWidgetBridge/);
   assert.match(bridge,/@JavascriptInterface/);
   assert.match(bridge,/eventsJson\.length\(\) > 1_000_000/);
