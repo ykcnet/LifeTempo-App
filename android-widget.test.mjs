@@ -41,7 +41,7 @@ test('resizing changes visible rows and widget taps open the matching app view',
 test('PWABuilder manifest has a PNG launch icon served with the correct MIME and cached offline',()=>{
   const icon=pwaManifest.icons.find(item=>item.type==='image/png');
   assert.deepEqual({sizes:icon.sizes,purpose:icon.purpose}, {sizes:'512x512',purpose:'any'});
-  assert.equal(fs.existsSync(new URL(`.${icon.src}`,import.meta.url)),true);
+  assert.equal(fs.existsSync(new URL(icon.src,import.meta.url)),true);
   assert.match(server,/'.png': 'image\/png'/);
   assert.match(read('./sw.js'),new RegExp(icon.src.replaceAll('/','\\/')));
 });

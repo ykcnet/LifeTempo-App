@@ -67,7 +67,9 @@ Android 原生 App 使用自己的 WebView 儲存空間，與 Chrome／PWA 資�
 
 ### PWABuilder APK
 
-PWABuilder 必須讀取公開 HTTPS 網址，無法封裝 `localhost` 或本機檔案。部署後先確認首頁、`/manifest.webmanifest`、`/sw.js` 與 manifest 中的 512 PNG 圖示可公開讀取，再將 HTTPS 網址輸入 [PWABuilder](https://www.pwabuilder.com/) 的 Package for Stores 流程。若要使用 TWA 全螢幕體驗，依產出的簽章憑證在網站部署 `/.well-known/assetlinks.json`；簽章變更後需同步更新。預約服務與 AI API 也必須部署在 HTTPS 同源環境，且正式公開前需完成伺服器安全設定。
+GitHub Actions 會在推送 `master` 後執行 `node build-pages.mjs`，只發布 PWA 靜態白名單，再部署至 `https://ykcnet.github.io/LifeTempo-App/`。首次使用前，請在 GitHub repository 的 Settings → Pages 將 Build and deployment source 設為 GitHub Actions。部署成功後，可先檢查首頁、`manifest.webmanifest`、`sw.js` 與 manifest 中的 512 PNG 圖示，再將上述 HTTPS 網址輸入 [PWABuilder](https://www.pwabuilder.com/) 的 Package for Stores 流程。
+
+GitHub Pages 僅提供本機儲存的 PWA 前端；Node／SQLite 預約服務、伺服器 AI API 與 Google OAuth 設定不會隨靜態站部署。若要使用完整服務，需另行將後端安全部署至 HTTPS 主機並設定同源 API。使用 TWA 全螢幕體驗時，還需依 PWABuilder 產出的簽章憑證部署 `/.well-known/assetlinks.json`；簽章變更後須同步更新。
 
 ### Android 主畫面 Widget
 

@@ -168,7 +168,8 @@ document.addEventListener('click',event=>{
 },true);
 
 if ('serviceWorker' in navigator && ['http:','https:'].includes(location.protocol)) {
-  navigator.serviceWorker.register('/sw.js').catch(()=>toast('離線快取未啟用，請確認使用 localhost 或 HTTPS'));
+  const appBase=new URL('./',document.baseURI);
+  navigator.serviceWorker.register(new URL('sw.js',appBase),{scope:appBase.pathname}).catch(()=>toast('離線快取未啟用，請確認使用 localhost 或 HTTPS'));
 }
 if (!location.hash.includes('join=')) render();
 
