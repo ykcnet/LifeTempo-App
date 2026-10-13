@@ -150,59 +150,7 @@ select option{font-size:1rem}.ai-select{width:100%;padding:8px 10px;border-radiu
 @media(min-width:1920px){
   body{font-size:1.075rem}
 }
-/* 小工具網格系統 */
-.widgets-page{padding:20px}
-.widgets-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px}
-.widgets-header h2{margin:0;font-size:24px;color:var(--ink)}
-.widgets-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:16px;grid-auto-rows:min-content}
-.widget-card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,0.04);transition:all 0.2s ease;position:relative;overflow:hidden}
-.widget-card:hover{box-shadow:0 4px 16px rgba(0,0,0,0.08);transform:translateY(-2px)}
-body.dark .widget-card{background:#222635;border-color:#34394b}
-.widget-card.widget-1x1{grid-column:span 1;grid-row:span 1;min-height:150px}
-.widget-card.widget-2x1{grid-column:span 2;grid-row:span 1;min-height:150px}
-.widget-card.widget-2x2{grid-column:span 2;grid-row:span 2;min-height:316px}
-.widget-card.widget-4x1{grid-column:span 4;grid-row:span 1;min-height:150px}
-.widget-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
-.widget-title{font-weight:600;font-size:14px;color:var(--ink);display:flex;align-items:center;gap:8px}
-.widget-menu-btn{border:none;background:transparent;color:var(--muted);cursor:pointer;padding:4px;border-radius:4px;font-size:16px}
-.widget-menu-btn:hover{background:var(--line);color:var(--ink)}
-.widget-content{flex:1;overflow:auto}
-.widget-content::-webkit-scrollbar{width:4px}
-.widget-content::-webkit-scrollbar-thumb{background:var(--line);border-radius:2px}
-.widget-empty{text-align:center;color:var(--muted);font-size:13px;padding:20px 0}
-/* 今日行程小工具 */
-.today-events-widget .event-item{padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px}
-.today-events-widget .event-item:last-child{border-bottom:none}
-.today-events-widget .event-time{font-size:12px;color:var(--muted);min-width:60px}
-.today-events-widget .event-title{flex:1;font-size:13px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.today-events-widget .event-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-.today-events-widget .no-events{color:var(--muted);font-size:13px;text-align:center;padding:20px 0}
-/* 待辦事項小工具 */
-.todo-widget .todo-item{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}
-.todo-widget .todo-item:last-child{border-bottom:none}
-.todo-widget .todo-check{width:18px;height:18px;cursor:pointer;accent-color:var(--purple)}
-.todo-widget .todo-text{flex:1;font-size:13px;color:var(--ink)}
-.todo-widget .todo-text.done{text-decoration:line-through;color:var(--muted)}
-.todo-widget .add-todo{display:flex;gap:8px;margin-top:8px}
-.todo-widget .add-todo input{flex:1;border:1px solid var(--line);border-radius:6px;padding:6px 10px;font-size:12px}
-.todo-widget .add-todo button{padding:6px 12px;font-size:12px;border-radius:6px}
-/* 小工具尺寸選擇器 */
-.widget-size-selector{display:flex;gap:8px;align-items:center}
-.widget-size-selector label{font-size:12px;color:var(--muted)}
-.widget-size-selector select{padding:6px 10px;border:1px solid var(--line);border-radius:6px;font-size:12px;background:#fff;color:var(--ink)}
-body.dark .widget-size-selector select{background:#191c27;color:#f1f4fc;border-color:#46516a}
-/* 小工具響應式適配 */
-@media(max-width:768px){
-  .widgets-grid{grid-template-columns:repeat(2,1fr)}
-  .widget-card.widget-2x1,.widget-card.widget-2x2,.widget-card.widget-4x1{grid-column:span 2}
-}
-@media(max-width:480px){
-  .widgets-grid{grid-template-columns:1fr}
-  .widget-card.widget-2x1,.widget-card.widget-2x2,.widget-card.widget-4x1{grid-column:span 1}
-}
-/* 小工具拖拽樣式 */
-.widget-card.dragging{opacity:0.5;transform:scale(0.95)}
-.widget-card.drag-over{border:2px dashed var(--purple)}
+.nav [data-goview="小工具"],.bottom-nav [data-goview="小工具"]{display:none!important}
 /* 觸控裝置優化 - 增大觸控目標 */
 @media(hover:none) and (pointer:coarse){
   .nav button,.cat-filter,.icon-btn,.choice-btn{min-height:48px;min-width:48px}
@@ -307,21 +255,10 @@ function monthView(){const first=new Date(cursor.getFullYear(),cursor.getMonth()
 function agendaView(){const start=view==='日'?new Date(cursor):today;return `<div class="card agenda">${Array.from({length:view==='日'?1:56},(_,i)=>{const d=new Date(start);d.setDate(d.getDate()+i);const es=occurrencesOn(iso(d)).filter(matches).sort((a,b)=>(a.start||'').localeCompare(b.start||''));if(!es.length&&(query||category!=='全部'))return '';return `<div class="agenda-day"><div class="agenda-date" data-local-date="${iso(d)}">${d.getMonth()+1}月 ${d.getDate()}日<small>週${dayNames[d.getDay()]} · ${esc(localDayDetail(d))}</small></div><div class="agenda-items">${es.length?es.map(e=>`<div class="agenda-item" data-edit="${esc(e.id)}" data-occurrence="${e.occurrence||e.date}" data-recurrence="${esc(e.recurrenceKey||e.date)}"><i class="dot" style="background:${color(e)}"></i><span>${esc(e.title)} <small>${e.allDay?'全天':formatTime(e.start)+' – '+formatTime(e.end)}${e.place?' · '+esc(e.place):''}${e.attendees?.length?' · '+esc(e.attendees.join(', ')):''}${(e.reminders||[]).length?' · 提醒 '+esc(e.reminders.join('、')):''}${(e.links||[]).map(l=>` · <a href="${esc(/^https?:\/\//i.test(l)?l:'#')}" target="_blank" rel="noopener">連結</a>`).join('')}</small></span></div>`).join(''):'<span class="empty">目前沒有行程</span>'}</div></div>`}).join('')}</div>`}
 function yearView(){return `<div class="card year-grid">${Array.from({length:12},(_,i)=>{let n=i+1,count=expandEvents(new Date(cursor.getFullYear(),i,1),new Date(cursor.getFullYear(),i+1,0)).filter(matches).length;return `<div class="year-month" data-month="${i}"><h3>${n} 月</h3><p>${count?`${count} 個行程`:'安排慢一點也沒關係'}</p></div>`}).join('')}</div>`}
 function miniMarkup(){let d=new Date(cursor.getFullYear(),cursor.getMonth(),1),off=(d.getDay()-LocalCalendar.settings.weekStart+7)%7,len=new Date(cursor.getFullYear(),cursor.getMonth()+1,0).getDate();return `<div class="mini-head"><span>${localYear(cursor.getFullYear())} 年 ${cursor.getMonth()+1} 月</span><span><button id="miniPrev">‹</button><button id="miniNext">›</button></span></div><div class="mini-grid">${localWeekdays().map(x=>`<span>${x}</span>`).join('')}${Array.from({length:42},(_,i)=>{let n=i-off+1;return `<button data-mini="${iso(new Date(cursor.getFullYear(),n<1?cursor.getMonth()-1:n>len?cursor.getMonth()+1:cursor.getMonth(),n<1?new Date(cursor.getFullYear(),cursor.getMonth(),0).getDate()+n:n>len?n-len:n))}">${n<1?new Date(cursor.getFullYear(),cursor.getMonth(),0).getDate()+n:n>len?n-len:n}</button>`}).join('')}</div>`}
-function render(){root.innerHTML=`<div class="app">${side()}<main class="main">${header()}${query?searchView():view==='週'||view==='日'?weekView():view==='月'?monthView():view==='年'?yearView():view==='待辦'?todoView():view==='預約'?bookingView():view==='設定'?settingsView():view==='共享'?sharingView():view==='小工具'?widgetsView():agendaView()}<div class="bottom-note">行程與設定保存在此裝置。透過匯出備份轉移資料。</div></main></div><nav class="bottom-nav"><button data-goview="日" class="${view==='日'?'active':''}"><span>◷</span>今天</button><button data-goview="週" class="${view==='週'?'active':''}"><span>▦</span>日曆</button><button id="addMobile"><span>＋</span>新增</button><button data-goview="月" class="${view==='月'?'active':''}"><span>▤</span>月份</button><button data-goview="小工具" class="${view==='小工具'?'active':''}"><span>⬡</span>小工具</button></nav>`;bind();bindTaskTitleEdits();bindSettingsControls();addHelpButtons();if(view==='小工具')bindWidgetsControls()}
+function render(){root.innerHTML=`<div class="app">${side()}<main class="main">${header()}${query?searchView():view==='週'||view==='日'?weekView():view==='月'?monthView():view==='年'?yearView():view==='待辦'?todoView():view==='預約'?bookingView():view==='設定'?settingsView():view==='共享'?sharingView():agendaView()}<div class="bottom-note">行程與設定保存在此裝置。透過匯出備份轉移資料。</div></main></div><nav class="bottom-nav"><button data-goview="日" class="${view==='日'?'active':''}"><span>◷</span>今天</button><button data-goview="週" class="${view==='週'?'active':''}"><span>▦</span>日曆</button><button id="addMobile"><span>＋</span>新增</button><button data-goview="月" class="${view==='月'?'active':''}"><span>▤</span>月份</button><button data-goview="小工具" class="${view==='小工具'?'active':''}"><span>⬡</span>小工具</button></nav>`;bind();bindTaskTitleEdits();bindSettingsControls();addHelpButtons()}
 function sharingView(){return `<section class="tool-row"><button id="createCalendar" class="primary">＋ 建立共享行事曆</button><button id="addInviteChannel">＋ 新增通訊軟體</button><span class="pill">目前身分：${esc(currentUser)}</span>${currentUser!=='我'?'<button id="ownerMode" class="tool-row">切換回擁有者</button>':''}</section><section class="card agenda"><h3>行事曆與存取權限</h3>${calendars.map(c=>`<article class="agenda-day" style="grid-template-columns:1fr auto"><div><b>${esc(c.name)}</b> <span class="pill">${permissionLabels[c.permission]}</span><small style="display:block;color:var(--muted);margin-top:6px">擁有者：${esc(c.owner||'我')} · 成員：${(c.members||[]).length?esc(c.members.join(', ')):'尚無成員'}</small></div><div>${c.id!=='personal'?`<button class="tool-row" data-invitecalendar="${c.id}">邀請人員</button> <button class="tool-row" data-editcalendar="${c.id}">設定</button> <button class="tool-row" data-deletecalendar="${c.id}">刪除</button>`:''}</div></article>`).join('')}<p class="drag-hint">支援管道：${inviteChannels.map(esc).join('、')}。新增通訊軟體後即可用來標記邀請方式。personal-only 不共享；read-only 成員只能檢視；full-access 成員可編輯與管理。</p><h3>邀請記錄</h3>${calendars.flatMap(c=>(c.invitations||[]).map(i=>`<article class="agenda-day" style="grid-template-columns:1fr auto"><div><b>${esc(i.person)}</b> · ${esc(i.channel)} · ${esc(c.name)}<small style="display:block;color:var(--muted)">權限：${permissionLabels[i.permission]} · RSVP：${esc(i.rsvp||'待回覆')}</small></div><div class="invite-actions"><button class="invite-action copy-action" data-copyinvite="${c.id}|${i.id}">複製邀請</button><button class="invite-action copy-action" data-copyjoin="${c.id}|${i.id}">複製加入連結</button><button class="invite-action delete-action" data-deleteinvite="${c.id}|${i.id}">刪除邀請</button></div></article>`)).join('')||'<p class="empty">目前沒有邀請記錄。</p>'}<p class="drag-hint">本機版本不會直接連線或傳送到 LINE、Messenger、微信等平台；複製邀請後，請自行貼到所選通訊軟體。</p></section>`}
 function todoView(){return `<section class="tool-row todo-controls"><input id="newTask" placeholder="新增待辦事項…" style="flex:1;min-width:140px;border:1px solid var(--line);border-radius:8px;padding:9px 11px;font:12px inherit"><input id="taskDue" type="date" value="${iso(cursor)}" style="border:1px solid var(--line);border-radius:8px;padding:7px"><button id="addTask">文字解析並安排日曆</button></section><p class="drag-hint">輸入待辦描述後按「文字解析並安排日曆」，即直接排入日曆。未指定時間時預設 09:00，時長 1 小時；可再點選行程調整。</p><section class="card agenda">${tasks.length?tasks.map(t=>`<div class="todo-row ${t.done?'done':''}" data-task="${t.id}"><input type="checkbox" data-taskcheck="${t.id}" ${t.done?'checked':''}><span class="task-title">${esc(t.title)}</span><small>${t.due||'未排日期'}</small><button type="button" data-taskplan="${t.id}">安排／查看行程</button><button class="icon-btn" data-taskdelete="${t.id}" style="width:29px;height:28px">×</button></div>`).join(''):'<p class="empty">待辦清單是空的，新增一項小任務開始吧。</p>'}</section>`}
 function bookingView(){let start=new Date(today);let dates=Array.from({length:14},(_,i)=>{let d=new Date(start);d.setDate(d.getDate()+i);return d}).filter(d=>bookingPrefs.days.includes(d.getDay()));let slots=[];for(const d of dates)for(let h=bookingPrefs.start;h+bookingPrefs.duration/60<=bookingPrefs.end;h+=bookingPrefs.duration/60){const time=`${pad(Math.floor(h))}:${pad(h%1*60)}`,endMinutes=h*60+bookingPrefs.duration,end=`${pad(Math.floor(endMinutes/60))}:${pad(endMinutes%60)}`,occupied=occurrencesOn(iso(d)).some(e=>e.allDay||e.start<end&&e.end>time);if(!occupied)slots.push({date:iso(d),time,end})}const connected=!!sessionStorage.getItem('lifetempo.ownerToken');const publicUrl=bookingSlug?`${location.origin}/book/${encodeURIComponent(bookingSlug)}`:'';return `<section class="tool-row"><span class="pill">${connected?'預約服務已連線':'尚未連線預約服務'}</span><button id="connectBookingService">${connected?'重新連線':'連線預約服務'}</button><button id="publishBookingService" ${connected?'':'disabled'}>發布／同步</button><button id="copyPublicBooking" ${connected&&bookingSlug?'':'disabled'}>複製公開連結</button><button id="configureBooking">設定可預約時段</button></section><div class="card agenda"><p class="drag-hint">可預約：${bookingPrefs.days.map(x=>'日一二三四五六'[x]).join('、')} ${formatHour(bookingPrefs.start)}–${formatHour(bookingPrefs.end)}，每段 ${bookingPrefs.duration} 分鐘。公開預約需先啟動服務並發布。</p>${publicUrl?`<p class="drag-hint">公開連結：<a href="${esc(publicUrl)}" target="_blank" rel="noopener">${esc(publicUrl)}</a></p>`:''}${slots.slice(0,35).map(s=>`<div class="agenda-item" style="padding:10px 0"><i class="dot" style="background:var(--teal)"></i><span>${s.date}　${formatTime(s.time)}　<button data-book="${s.date}|${s.time}|${s.end}" class="tool-row" style="display:inline;padding:5px 8px;margin:0">本機建立預約</button></span></div>`).join('')}</div>`}
-// 小工具配置
-let widgetsConfig=JSON.parse(localStorage.getItem('lifetempo.widgets')||'[]');
-function saveWidgetsConfig(){localStorage.setItem('lifetempo.widgets',JSON.stringify(widgetsConfig))}
-// 小工具頁面
-function widgetsView(){const todayEvents=occurrencesOn(iso(today)).filter(matches).sort((a,b)=>(a.start||'').localeCompare(b.start||''));return `<div class="widgets-page"><div class="widgets-header"><h2>小工具</h2><div class="tool-row"><button id="addTodayEvents" class="primary">＋ 今日行程</button><button id="addTodoWidget" class="primary">＋ 待辦事項</button></div></div><div class="widgets-grid" id="widgetsGrid">${widgetsConfig.map(w=>renderWidget(w)).join('')}</div></div>`}
-// 渲染單個小工具
-function renderWidget(config){if(config.type==='todayEvents')return renderTodayEventsWidget(config);if(config.type==='todo')return renderTodoWidget(config);return ''}
-// 今日行程小工具
-function renderTodayEventsWidget(config){const todayEvents=occurrencesOn(iso(today)).filter(matches).sort((a,b)=>(a.start||'').localeCompare(b.start||''));const sizeClass=config.size||'widget-2x1';return `<div class="widget-card ${sizeClass} today-events-widget" data-widget-id="${config.id}"><div class="widget-header"><div class="widget-title"><span>📅</span> 今日行程</div><button class="widget-menu-btn" data-widget-menu="${config.id}">⋮</button></div><div class="widget-content">${todayEvents.length?todayEvents.slice(0,config.size==='widget-1x1'?3:config.size==='widget-2x2'?10:5).map(e=>`<div class="event-item" data-edit="${esc(e.id)}" data-occurrence="${e.occurrence||e.date}"><div class="event-time">${e.allDay?'全天':formatTime(e.start)}</div><div class="event-title">${esc(e.title)}</div><div class="event-dot" style="background:${color(e)}"></div></div>`).join(''):'<div class="no-events">今天沒有行程</div>'}</div></div>`}
-// 待辦事項小工具
-function renderTodoWidget(config){const sizeClass=config.size||'widget-2x1';return `<div class="widget-card ${sizeClass} todo-widget" data-widget-id="${config.id}"><div class="widget-header"><div class="widget-title"><span>☑</span> 待辦事項</div><button class="widget-menu-btn" data-widget-menu="${config.id}">⋮</button></button></div><div class="widget-content">${tasks.length?tasks.slice(0,config.size==='widget-1x1'?3:config.size==='widget-2x2'?10:5).map(t=>`<div class="todo-item"><input type="checkbox" class="todo-check" data-todowidget-check="${t.id}" ${t.done?'checked':''}><span class="todo-text ${t.done?'done':''}">${esc(t.title)}</span></div>`).join(''):'<div class="no-events">待辦清單是空的</div>'}${config.size!=='widget-1x1'?`<div class="add-todo"><input type="text" id="widgetTodoInput" placeholder="新增待辦…"><button id="widgetTodoAdd">新增</button></div>`:''}</div></div>`}
 function seasonalTerm(d){return LocalCalendar.settings.terms?LocalCalendarData.terms[iso(d)]||'':''}
 function parseNaturalTime(input){
   const number=value=>{if(/^\d+$/.test(value))return Number(value);const digits='零一二三四五六七八九';value=value.replace(/兩/g,'二');if(value==='十')return 10;if(value.includes('十')){const [a,b]=value.split('十');return (a?digits.indexOf(a):1)*10+(b?digits.indexOf(b):0)}return digits.indexOf(value)};
@@ -815,149 +752,6 @@ function bindTaskTitleEdits(){
     element.onclick=edit;
     element.onkeydown=event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();edit()}};
   });
-}
-// 小工具控制綁定
-function bindWidgetsControls(){
-  // 添加今日行程小工具
-  if($('#addTodayEvents'))$('#addTodayEvents').onclick=()=>{
-    const id=crypto.randomUUID();
-    widgetsConfig.push({id,type:'todayEvents',size:'widget-2x1'});
-    saveWidgetsConfig();
-    render();
-    toast('已添加今日行程小工具');
-  };
-  // 添加待辦事項小工具
-  if($('#addTodoWidget'))$('#addTodoWidget').onclick=()=>{
-    const id=crypto.randomUUID();
-    widgetsConfig.push({id,type:'todo',size:'widget-2x1'});
-    saveWidgetsConfig();
-    render();
-    toast('已添加待辦事項小工具');
-  };
-  // 小工具選單
-  document.querySelectorAll('[data-widget-menu]').forEach(btn=>{
-    btn.onclick=()=>{
-      const widgetId=btn.dataset.widgetMenu;
-      const widget=widgetsConfig.find(w=>w.id===widgetId);
-      if(!widget)return;
-      // 顯示尺寸選擇選單
-      const menu=document.createElement('div');
-      menu.className='widget-menu';
-      menu.style.cssText='position:absolute;right:8px;top:40px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px;box-shadow:0 4px 16px rgba(0,0,0,0.15);z-index:1000';
-      menu.innerHTML=`
-        <div style="font-size:12px;color:var(--muted);margin-bottom:8px;padding:0 4px">尺寸</div>
-        <button class="tool-row" data-widget-resize="${widgetId}" data-size="widget-1x1" style="display:block;width:100%;text-align:left;margin-bottom:4px">小方形 (1x1)</button>
-        <button class="tool-row" data-widget-resize="${widgetId}" data-size="widget-2x1" style="display:block;width:100%;text-align:left;margin-bottom:4px">橫向條狀 (2x1)</button>
-        <button class="tool-row" data-widget-resize="${widgetId}" data-size="widget-2x2" style="display:block;width:100%;text-align:left;margin-bottom:4px">大方塊 (2x2)</button>
-        <button class="tool-row" data-widget-resize="${widgetId}" data-size="widget-4x1" style="display:block;width:100%;text-align:left;margin-bottom:8px">全寬橫條 (4x1)</button>
-        <div style="border-top:1px solid var(--line);margin:8px 0"></div>
-        <button class="tool-row" data-widget-delete="${widgetId}" style="display:block;width:100%;text-align:left;color:#c84752">刪除小工具</button>
-      `;
-      document.body.appendChild(menu);
-      // 點擊其他地方關閉選單
-      const closeMenu=e=>{
-        if(!menu.contains(e.target)&&e.target!==btn){menu.remove();document.removeEventListener('click',closeMenu);}
-      };
-      setTimeout(()=>document.addEventListener('click',closeMenu),0);
-      // 尺寸調整
-      menu.querySelectorAll('[data-widget-resize]').forEach(resizeBtn=>{
-        resizeBtn.onclick=()=>{
-          widget.size=resizeBtn.dataset.size;
-          saveWidgetsConfig();
-          render();
-          menu.remove();
-        };
-      });
-      // 刪除小工具
-      menu.querySelector('[data-widget-delete]').onclick=()=>{
-        if(confirm('確定要刪除這個小工具嗎？')){
-          widgetsConfig=widgetsConfig.filter(w=>w.id!==widgetId);
-          saveWidgetsConfig();
-          render();
-          menu.remove();
-        }
-      };
-    };
-  });
-  // 待辦勾選
-  document.querySelectorAll('[data-todowidget-check]').forEach(cb=>{
-    cb.onclick=()=>{
-      const taskId=cb.dataset.todowidgetcheck;
-      const task=tasks.find(t=>t.id===taskId);
-      if(task){
-        task.done=cb.checked;
-        saveTasks();
-        render();
-      }
-    };
-  });
-  // 小工具內新增待辦
-  if($('#widgetTodoAdd'))$('#widgetTodoAdd').onclick=()=>{
-    const input=$('#widgetTodoInput');
-    const title=input.value.trim();
-    if(!title){toast('請輸入待辦內容');return;}
-    const task={id:crypto.randomUUID(),title,due:iso(today),done:false};
-    tasks.push(task);
-    saveTasks();
-    input.value='';
-    render();
-    toast('已新增待辦事項');
-  };
-  // 點擊行程跳轉
-  document.querySelectorAll('.event-item').forEach(item=>{
-    item.onclick=()=>{
-      const eventId=item.dataset.edit;
-      const event=events.find(e=>e.id===eventId);
-      if(event){
-        cursor=parse(event.date);
-        view='日';
-        render();
-      }
-    };
-  });
-  // 小工具拖拽功能
-  const grid=$('#widgetsGrid');
-  if(grid){
-    let draggedItem=null;
-    grid.querySelectorAll('.widget-card').forEach(card=>{
-      card.draggable=true;
-      card.ondragstart=e=>{
-        draggedItem=card;
-        card.classList.add('dragging');
-        e.dataTransfer.effectAllowed='move';
-      };
-      card.ondragend=()=>{
-        card.classList.remove('dragging');
-        draggedItem=null;
-        grid.querySelectorAll('.widget-card').forEach(c=>c.classList.remove('drag-over'));
-      };
-      card.ondragover=e=>{
-        e.preventDefault();
-        if(draggedItem&&draggedItem!==card){
-          card.classList.add('drag-over');
-        }
-      };
-      card.ondragleave=()=>{
-        card.classList.remove('drag-over');
-      };
-      card.ondrop=e=>{
-        e.preventDefault();
-        if(draggedItem&&draggedItem!==card){
-          const draggedId=draggedItem.dataset.widgetId;
-          const targetId=card.dataset.widgetId;
-          const draggedIndex=widgetsConfig.findIndex(w=>w.id===draggedId);
-          const targetIndex=widgetsConfig.findIndex(w=>w.id===targetId);
-          if(draggedIndex!==-1&&targetIndex!==-1){
-            const [removed]=widgetsConfig.splice(draggedIndex,1);
-            widgetsConfig.splice(targetIndex,0,removed);
-            saveWidgetsConfig();
-            render();
-          }
-        }
-        card.classList.remove('drag-over');
-      };
-    });
-  }
 }
 function scheduleTask(id){
   const task=tasks.find(t=>t.id===id);if(!task)return;

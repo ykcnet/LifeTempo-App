@@ -12,7 +12,7 @@ test('task selected date is used when text has no date',()=>{assert.equal(run('�
 test('already scheduled task goes to linked event without duplicating it',()=>{const event={id:'event',sourceTaskId:'task',date:'2026-10-15',calendarId:'personal'};const c=run('開會',event);assert.equal(c.events.length,1);assert.equal(c.cursor,'2026-10-15');});
 test('failed save preserves the task and does not leave a phantom event',()=>{const c=run('開會',null,true);assert.equal(c.events.length,0);assert.equal(c.tasks.length,1);assert.equal(c.tasks[0].eventId,undefined);});
 const editStart=html.indexOf('function updateTaskTitle(');
-const editEnd=html.indexOf('\n// 小工具控制綁定',editStart);
+const editEnd=html.indexOf('\nfunction scheduleTask(',editStart);
 const editSource=html.slice(editStart,editEnd);
 function editTask(value,fail=false,key='click'){
  const element={style:{},attributes:{},closest:()=>({dataset:{task:'task'}}),setAttribute(name,text){this.attributes[name]=text}};

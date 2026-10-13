@@ -22,6 +22,14 @@ test('Android app declares both installable home-screen widgets',()=>{
   }
 });
 
+test('widgets exist only as native home-screen components, not an in-app widget manager',()=>{
+  const html=read('./index.html');
+  assert.doesNotMatch(html,/function widgetsView|function renderWidget|widgetsConfig|bindWidgetsControls/);
+  assert.match(html,/\.nav \[data-goview="小工具"\],\.bottom-nav \[data-goview="小工具"\]\{display:none!important\}/);
+  assert.match(manifest,/TodayEventsWidgetProvider/);
+  assert.match(manifest,/TodoWidgetProvider/);
+});
+
 test('Android shell serves only app assets and exposes a bounded widget snapshot bridge',()=>{
   assert.match(app,/WebViewAssetLoader/);
   assert.match(app,/LifeTempoWidgetBridge/);
