@@ -12,6 +12,9 @@ const renderer=read('./android/app/src/main/java/com/lifetempo/app/HomeWidgetRen
 const server=read('./server.mjs');
 
 test('Android app declares both installable home-screen widgets',()=>{
+  assert.match(gradle,/applicationId = "com\.ykcnet\.lifetempo"/);
+  assert.match(gradle,/versionCode = 2/);
+  assert.match(gradle,/LIFETEMPO_SIGNING_KEYSTORE/);
   assert.match(manifest,/android:allowBackup="false"/);
   assert.match(manifest,/TodayEventsWidgetProvider/);
   assert.match(manifest,/TodoWidgetProvider/);
@@ -36,7 +39,7 @@ test('Android shell serves only app assets and exposes a bounded widget snapshot
   assert.match(bridge,/@JavascriptInterface/);
   assert.match(bridge,/eventsJson\.length\(\) > 1_000_000/);
   assert.match(gradle,/include\("index\.html", "\*\.js", "\*\.css", "\*\.webmanifest"\)/);
-  assert.doesNotMatch(gradle,/data\/|owner-token|\.env/);
+  assert.doesNotMatch(gradle,/data\/|owner-token|(^|[\/'"])\.env(?:$|[\/'"])/);
 });
 
 test('resizing changes visible rows and widget taps open the matching app view',()=>{

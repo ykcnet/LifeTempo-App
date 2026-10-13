@@ -63,7 +63,7 @@ SQLite 預約資料與 owner token 儲存在 `data/`。外部成功預約會立�
 - 首次使用從空白行事曆開始，不自動加入範本或示範行程。可自行選取其他行事曆匯出的 iCalendar `.ics` 或 JSON 備份，確認後匯入；支援 JSON／ICS 匯出。
 - 行程資料、待辦、分類和主題保存在瀏覽器 `localStorage`。
 
-Android 原生 App 使用自己的 WebView 儲存空間，與 Chrome／PWA 資料分開；首次移轉請先從原本版本匯出 JSON，再於 Android App 匯入。Android 主畫面 Widget 顯示 App 內資料；App 本身不另設 Widget 管理頁。
+Android 原生 App 使用自己的 WebView 儲存空間，與 Chrome／PWA 資料分開；安裝原生 Widget 版前，請先從 TWA/PWA 匯出 JSON，再於原生 App 匯入。Android 主畫面 Widget 顯示原生 App 內資料；App 本身不另設 Widget 管理頁。原生更新包固定使用 `com.ykcnet.lifetempo`，由本機環境變數提供 keystore 路徑與密碼，不得將密碼寫入版本庫。
 
 ### PWABuilder APK
 

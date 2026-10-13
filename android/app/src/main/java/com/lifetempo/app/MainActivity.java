@@ -22,7 +22,7 @@ public final class MainActivity extends Activity {
         webView.addJavascriptInterface(new LifeTempoWidgetBridge(this), "LifeTempoWidget");
 
         WebViewAssetLoader assetLoader = new WebViewAssetLoader.Builder()
-                .addPathHandler("/", new WebViewAssetLoader.AssetsPathHandler(this, "www"))
+                    .addPathHandler("/", new WebViewAssetLoader.AssetsPathHandler(this))
                 .build();
         webView.setWebViewClient(new WebViewClientCompat() {
             @Override
