@@ -9,7 +9,8 @@ const files=[
   'ai-request.js','booking-client.js','enhancements.js','localization-data.js',
   'localization-core.js','localization-client.js','localization.css','vendor/ical.js',
   'LifeTempo-Icons/android/play-store-512.png','LifeTempo-Icons/source/LifeTempo-rounded.svg',
-  'LifeTempo-Icons/windows/LifeTempo.ico','LifeTempo-Icons/windows/LifeTempo-512.png'
+  'LifeTempo-Icons/windows/LifeTempo.ico','LifeTempo-Icons/windows/LifeTempo-512.png',
+  '.well-known/assetlinks.json'
 ];
 
 fs.rmSync(output,{recursive:true,force:true});
