@@ -1,1 +1,1 @@
-[{"relation":["delegate_permission/common.handle_all_urls"],"target":{"namespace":"android_app","package_name":"com.ykcnet.lifetempo","sha256_cert_fingerprints":["6A:60:E3:0E:93:94:9D:AE:C3:E7:5E:A4:27:37:C9:41:0F:62:37:30:70:6A:E7:30:80:C6:4E:4F:82:60:0B:E5"]}}]
+[{"relation":["delegate_permission/common.handle_all_urls"],"target":{"namespace":"android_app","package_name":"com.ykcnet.lifetempo","sha256_cert_fingerprints":["20:86:72:B8:16:1F:EC:80:66:73:84:8E:C7:13:6A:2A:39:C2:F9:5B:B3:3A:07:52:8D:C6:FA:F8:A3:7A:5C:25"]}}]
