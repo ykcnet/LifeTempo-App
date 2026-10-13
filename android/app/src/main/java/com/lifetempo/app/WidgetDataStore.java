@@ -8,9 +8,10 @@ public final class WidgetDataStore {
 
     private WidgetDataStore() {}
 
-    public static void update(Context context, String eventsJson, String tasksJson) {
+    public static void update(Context context, String eventsJson, String tasksJson, int weekStart) {
         SharedPreferences preferences = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        preferences.edit().putString("events", eventsJson).putString("tasks", tasksJson).apply();
+        preferences.edit().putString("events", eventsJson).putString("tasks", tasksJson)
+                .putInt("weekStart", weekStart == 1 ? 1 : 0).apply();
         HomeWidgetRenderer.refreshAll(context);
     }
 

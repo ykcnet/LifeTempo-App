@@ -228,13 +228,13 @@ function saveTasks(){localStorage.setItem('lifetempo.tasks',JSON.stringify(tasks
 function syncAndroidWidgets(){
   const bridge=window.LifeTempoWidget;if(typeof bridge?.updateSnapshot!=='function')return;
   try{
-    const end=new Date(today);end.setDate(end.getDate()+30);
-    const upcoming=expandEvents(today,end).slice(0,120).map(event=>({title:event.title,date:event.displayDate||event.occurrence||event.date,start:event.start||'',allDay:!!event.allDay}));
-    bridge.updateSnapshot(JSON.stringify(upcoming),JSON.stringify(tasks.filter(task=>!task.done).slice(0,100)));
+    const start=new Date(today.getFullYear(),today.getMonth(),1),end=new Date(today);end.setDate(end.getDate()+30);
+    const upcoming=expandEvents(start,end).slice(0,120).map(event=>({title:event.title,date:event.displayDate||event.occurrence||event.date,start:event.start||'',allDay:!!event.allDay}));
+    bridge.updateSnapshot(JSON.stringify(upcoming),JSON.stringify(tasks.filter(task=>!task.done).slice(0,100)),LocalCalendar.settings.weekStart);
   }catch{}
 }
 const widgetLaunch=new URLSearchParams(location.search).get('widget');
-if(widgetLaunch==='todo')view='待辦';else if(widgetLaunch==='today')view='日';
+if(widgetLaunch==='todo')view='待辦';else if(widgetLaunch==='today')view='日';else if(widgetLaunch==='calendar')view='月';
 function color(e){return COLORS[e.category]||COLORS.其他}
 function matches(e){return(category==='全部'||e.category===category)&&(!query||`${e.title} ${e.notes} ${e.place} ${e.category} ${(e.attendees||[]).join(' ')}`.toLowerCase().includes(query.toLowerCase()))&&(!attendeeFilter||(e.attendees||[]).includes(attendeeFilter))&&(!calendarFilter||(e.calendarId||'personal')===calendarFilter)}
 let attendeeFilter='';

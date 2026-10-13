@@ -52,7 +52,7 @@ SQLite 預約資料與 owner token 儲存在 `data/`。外部成功預約會立�
 - 單一行程多組提醒設定；可請求瀏覽器通知權限，App 開啟時排程本機提醒。
 - 標題、說明、地點、分類與參與者全文搜尋；分類和參與者篩選；使用者可新增分類與色彩。
 - 待辦新增、編輯、完成、刪除；編輯標題會同步更新已連結的行程，拖曳待辦到週/日視圖日期可轉成一小時行程。
-- Android 原生 App 提供「今日行程」及「待辦事項」主畫面 Widget，可從 Android Widget 選單加入並水平／垂直調整尺寸；開啟 App 後同步目前資料快照。Android 專案位於 `android/`，以 Android Studio 開啟建置。
+- Android 原生 App 提供「月曆」、「今日行程」及「待辦事項」三種主畫面 Widget，可從 Android Widget 選單加入並水平／垂直調整尺寸；月曆依手機尺寸顯示日期格與行程標記，週起始日跟隨 App 設定。Android 專案位於 `android/`，以 Android Studio 開啟建置。
 - 可預約空檔的本機預覽與預約設定。
 - Node.js/SQLite 預約服務：公開預約頁、日期與空檔 API、姓名/Email/備註表單、交易鎖定避免同一時段重複預約、owner token 保護的設定與忙碌時段同步、簡易請求速率限制。LifeTempo 可發布未來 180 天忙碌時段及匯入外部預約。
 - 共享行事曆本機管理：建立/刪除共享日曆、改名、設定 personal-only / read-only / full-access、依日曆篩選行程；唯讀行事曆會阻止新增或編輯事件。
@@ -73,7 +73,7 @@ GitHub Pages 僅提供本機儲存的 PWA 前端；Node／SQLite 預約服務、
 
 ### Android 主畫面 Widget
 
-使用 Android Studio 開啟 `android/` 並執行 App。首次開啟後，長按手機主畫面空白處，選擇「小工具 → LifeTempo」，加入「今日行程」或「待辦事項」；加入後可拖曳邊緣調整寬、高。點擊 Widget 會開啟 App 的對應畫面。Widget 快照僅在本機保存，Android Auto Backup 已關閉。此工作區沒有 Android SDK，尚未在本機產生或實機驗收 APK。
+使用 Android Studio 開啟 `android/` 並執行 App。首次開啟後，長按手機主畫面空白處，選擇「小工具 → LifeTempo」，加入「月曆」、「今日行程」或「待辦事項」；加入後可拖曳邊緣調整寬、高。月曆標示當日及有行程日期，點擊月曆 Widget 會開啟 App 月視圖。Widget 快照僅在本機保存，Android Auto Backup 已關閉。
 
 ## 尚需服務端或原生 App 的部分
 

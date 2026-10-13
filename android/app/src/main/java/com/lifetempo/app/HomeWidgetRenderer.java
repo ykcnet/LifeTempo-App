@@ -12,7 +12,9 @@ import org.json.JSONObject;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 final class HomeWidgetRenderer {
     private HomeWidgetRenderer() {}
@@ -21,8 +23,79 @@ final class HomeWidgetRenderer {
         AppWidgetManager manager = AppWidgetManager.getInstance(context);
         int[] eventIds = manager.getAppWidgetIds(new ComponentName(context, TodayEventsWidgetProvider.class));
         int[] taskIds = manager.getAppWidgetIds(new ComponentName(context, TodoWidgetProvider.class));
+        int[] calendarIds = manager.getAppWidgetIds(new ComponentName(context, CalendarWidgetProvider.class));
         update(context, manager, eventIds, false);
         update(context, manager, taskIds, true);
+        updateCalendar(context, manager, calendarIds);
+    }
+
+    static void updateCalendar(Context context, AppWidgetManager manager, int[] ids) {
+        if (ids == null || ids.length == 0) return;
+        Set<String> eventDates = new HashSet<>();
+        try {
+            JSONArray rows = new JSONArray(WidgetDataStore.events(context));
+            for (int i = 0; i < rows.length(); i++) {
+                JSONObject item = rows.optJSONObject(i);
+                String date = item == null ? "" : item.optString("date", "");
+                if (date.matches("\\d{4}-\\d{2}-\\d{2}")) eventDates.add(date);
+            }
+        } catch (Exception ignored) {}
+
+        LocalDate today = LocalDate.now();
+        LocalDate first = today.withDayOfMonth(1);
+        int weekStart = context.getSharedPreferences("lifetempo_widgets", Context.MODE_PRIVATE)
+                .getInt("weekStart", 0);
+        int firstDay = first.getDayOfWeek().getValue() % 7;
+        LocalDate gridStart = first.minusDays((firstDay - weekStart + 7) % 7);
+
+        for (int id : ids) {
+            Bundle options = manager.getAppWidgetOptions(id);
+            int minWidth = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 250);
+            int minHeight = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 200);
+            float dayTextSize = minWidth < 230 ? 9f : 12f;
+            float weekdayTextSize = minWidth < 230 ? 8f : 10f;
+            if (minHeight < 150) dayTextSize = 8f;
+
+            RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_calendar);
+            views.setTextViewText(R.id.widget_title, today.getYear() + " 年 " + today.getMonthValue() + " 月");
+
+            String[] weekdays = weekStart == 1
+                    ? new String[]{"一", "二", "三", "四", "五", "六", "日"}
+                    : new String[]{"日", "一", "二", "三", "四", "五", "六"};
+            views.removeAllViews(R.id.calendar_weekdays);
+            for (String weekday : weekdays) {
+                RemoteViews label = new RemoteViews(context.getPackageName(), R.layout.widget_calendar_weekday);
+                label.setTextViewText(R.id.calendar_weekday, weekday);
+                label.setTextViewTextSize(R.id.calendar_weekday, 2, weekdayTextSize);
+                views.addView(R.id.calendar_weekdays, label);
+            }
+
+            views.removeAllViews(R.id.calendar_days);
+            for (int week = 0; week < 6; week++) {
+                RemoteViews row = new RemoteViews(context.getPackageName(), R.layout.widget_calendar_week);
+                for (int day = 0; day < 7; day++) {
+                    LocalDate date = gridStart.plusDays(week * 7L + day);
+                    RemoteViews cell = new RemoteViews(context.getPackageName(), R.layout.widget_calendar_day);
+                    String marker = eventDates.contains(date.toString()) ? "\n•" : "";
+                    cell.setTextViewText(R.id.calendar_day, date.getDayOfMonth() + marker);
+                    cell.setTextViewTextSize(R.id.calendar_day, 2, dayTextSize);
+                    int textColor = date.getMonthValue() == today.getMonthValue() ? 0xFF303744 : 0xFF9AA1AE;
+                    cell.setTextColor(R.id.calendar_day, textColor);
+                    cell.setInt(R.id.calendar_day, "setBackgroundResource",
+                            date.equals(today) ? R.drawable.widget_calendar_today : R.drawable.widget_calendar_cell);
+                    row.addView(R.id.calendar_week_row, cell);
+                }
+                views.addView(R.id.calendar_days, row);
+            }
+
+            Intent open = new Intent(context, MainActivity.class)
+                    .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                    .putExtra("widget", "calendar");
+            PendingIntent pending = PendingIntent.getActivity(context, 3, open,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            views.setOnClickPendingIntent(R.id.widget_root, pending);
+            manager.updateAppWidget(id, views);
+        }
     }
 
     static void update(Context context, AppWidgetManager manager, int[] ids, boolean todo) {

@@ -11,14 +11,15 @@ const bridge=read('./android/app/src/main/java/com/lifetempo/app/LifeTempoWidget
 const renderer=read('./android/app/src/main/java/com/lifetempo/app/HomeWidgetRenderer.java');
 const server=read('./server.mjs');
 
-test('Android app declares both installable home-screen widgets',()=>{
+test('Android app declares installable home-screen widgets',()=>{
   assert.match(gradle,/applicationId = "com\.ykcnet\.lifetempo"/);
-  assert.match(gradle,/versionCode = 2/);
+  assert.match(gradle,/versionCode = 3/);
   assert.match(gradle,/LIFETEMPO_SIGNING_KEYSTORE/);
   assert.match(manifest,/android:allowBackup="false"/);
   assert.match(manifest,/TodayEventsWidgetProvider/);
   assert.match(manifest,/TodoWidgetProvider/);
-  for(const file of ['today_widget_info.xml','todo_widget_info.xml']) {
+  assert.match(manifest,/CalendarWidgetProvider/);
+  for(const file of ['today_widget_info.xml','todo_widget_info.xml','calendar_widget_info.xml']) {
     const info=read(`./android/app/src/main/res/xml/${file}`);
     assert.match(info,/android:widgetCategory="home_screen"/);
     assert.match(info,/android:resizeMode="horizontal\|vertical"/);
@@ -44,9 +45,12 @@ test('Android shell serves only app assets and exposes a bounded widget snapshot
 
 test('resizing changes visible rows and widget taps open the matching app view',()=>{
   assert.match(renderer,/OPTION_APPWIDGET_MIN_HEIGHT/);
+  assert.match(renderer,/static void updateCalendar/);
+  assert.match(read('./android/app/src/main/java/com/lifetempo/app/CalendarWidgetProvider.java'),/onAppWidgetOptionsChanged/);
   assert.match(renderer,/putExtra\("widget", todo \? "todo" : "today"\)/);
+  assert.match(read('./index.html'),/widgetLaunch==='calendar'\)view='月'/);
   assert.match(read('./index.html'),/widgetLaunch==='todo'\)view='待辦'/);
-  assert.match(read('./index.html'),/bridge\.updateSnapshot\(JSON\.stringify\(upcoming\),JSON\.stringify\(tasks\.filter\(task=>!task\.done\)\.slice\(0,100\)\)\)/);
+  assert.match(read('./index.html'),/bridge\.updateSnapshot\(JSON\.stringify\(upcoming\),JSON\.stringify\(tasks\.filter\(task=>!task\.done\)\.slice\(0,100\)\),LocalCalendar\.settings\.weekStart\)/);
 });
 
 test('PWABuilder manifest has a PNG launch icon served with the correct MIME and cached offline',()=>{

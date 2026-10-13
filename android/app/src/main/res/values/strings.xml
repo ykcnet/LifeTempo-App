@@ -1,5 +1,7 @@
 <resources>
     <string name="app_name">LifeTempo 生活節奏</string>
+    <string name="calendar_widget_name">月曆</string>
+    <string name="calendar_widget_description">顯示當月日期與行程標記</string>
     <string name="today_widget_description">顯示近期行程</string>
     <string name="todo_widget_description">顯示尚未完成的待辦事項</string>
 </resources>
