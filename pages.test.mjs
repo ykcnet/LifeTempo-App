@@ -9,7 +9,7 @@ const read=path=>fs.readFileSync(new URL(path,root),'utf8');
 test('Pages build emits only the allowlisted static PWA files',()=>{
   execFileSync(process.execPath,['build-pages.mjs'],{cwd:new URL('.',import.meta.url)});
   const output=new URL('./_site/',root);
-  for(const file of ['index.html','manifest.webmanifest','sw.js','ai-request.js','vendor/ical.js','LifeTempo-Icons/android/play-store-512.png','.well-known/assetlinks.json']) {
+  for(const file of ['.nojekyll','index.html','manifest.webmanifest','sw.js','ai-request.js','vendor/ical.js','LifeTempo-Icons/android/play-store-512.png','.well-known/assetlinks.json']) {
     assert.equal(fs.existsSync(new URL(file,output)),true,file);
   }
   for(const file of ['server.mjs','data/owner-token','android/app/build.gradle.kts','localization-sources/tw-2027.csv']) {
