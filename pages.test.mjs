@@ -17,6 +17,15 @@ test('Pages build emits only the allowlisted static PWA files',()=>{
   }
 });
 
+test('mobile keeps the AI planner entry and calendar navigation controls',()=>{
+  const html=read('index.html');
+  assert.match(html,/@media\(min-width:651px\)\{#aiPlanBtn\{display:none!important\}\}/);
+  assert.match(html,/id="aiPlanNav"/);
+  assert.match(html,/id="prev"/);
+  assert.match(html,/id="today"/);
+  assert.match(html,/id="next"/);
+});
+
 test('PWA manifest and Service Worker resolve within a repository subpath',()=>{
   const manifest=JSON.parse(read('manifest.webmanifest'));
   assert.equal(manifest.start_url,'./');
