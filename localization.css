@@ -1,0 +1,32 @@
+.local-source{font-size:11px;line-height:1.7;color:var(--muted);margin:8px 0 14px}.local-source a{color:#5142b2}.local-badges{display:flex;flex-wrap:wrap;gap:3px;margin-top:4px}.local-badge{display:inline-block;padding:2px 5px;border-radius:4px;font-size:10px;line-height:1.4;white-space:normal}.local-badge.holiday{color:#9d283f;background:#fff0f2}.local-badge.makeup{color:#835500;background:#fff3d7}.local-badge.term{color:#076d60;background:#e4f7ee}.local-day-off>.month-day,.local-day-off.day-head{color:#af304c}.local-weather{padding:14px 18px;margin-bottom:18px}.local-weather p{margin:6px 0;font-size:13px}.local-weather small{display:block;font-size:11px;color:var(--muted)}.local-weather-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.local-weather button{border:1px solid var(--line);background:transparent;color:var(--ink);padding:7px 12px;border-radius:8px;cursor:pointer}.local-weather details{margin-top:10px;font-size:12px}.local-weather summary{cursor:pointer}.local-forecast{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin:12px 0;line-height:1.8}.local-settings{padding:18px 20px;margin-top:16px}.local-checks{display:flex;gap:14px;flex-wrap:wrap}.local-checks input{width:auto}.locale-hide-lunar .lunar,.locale-hide-weeks .weeknum{display:none!important}body.dark .local-source a{color:#d5ceff}body.dark .local-badge.holiday{color:#ffc3cf;background:#4b2836}body.dark .local-badge.makeup{color:#ffe0a3;background:#473a25}body.dark .local-badge.term{color:#a7eed5;background:#204239}body.dark .local-day-off>.month-day,body.dark .local-day-off.day-head{color:#ffc3cf}
+
+/* Calendar dates remain larger than lunar annotations at every font setting. */
+.month-day,.month-day.today{font-size:1.25rem;font-weight:600;line-height:1.5}
+.month-day.today{width:auto;min-width:30px;height:auto;padding:0 5px;border-radius:8px}
+.day-head strong{font-size:1.375rem;width:34px;height:34px;line-height:34px}
+.month-day .lunar,.day-head .lunar{font-size:.8125rem;font-weight:400}
+.agenda-date{font-size:1.125rem}
+.import-steps{display:flex;flex-wrap:wrap;gap:8px;list-style:none;padding:0;font-size:.875rem;color:var(--muted)}
+.import-steps li{padding:5px 9px;border:1px solid var(--line);border-radius:8px}
+.import-steps [aria-current=step]{background:var(--purple);color:white;font-weight:600}
+#importWizard #importStep{min-width:0}
+#importWizard #importStep>button{margin:6px 4px 6px 0;padding:10px;border-radius:8px;cursor:pointer}
+#importWizard [role=status]{overflow-wrap:anywhere}
+
+/* Function pages retain navigation but omit unrelated calendar controls. */
+.workspace-function .main>.viewbar,
+.workspace-function .main>.tool-row,
+.workspace-function .main>.local-source,
+.workspace-function .hero-actions,
+.workspace-function .hero .eyebrow,
+.workspace-function .hero p,
+.workspace-function .top-actions{display:none!important}
+.workspace-function .hero{margin-bottom:18px}
+.workspace-function .main>.todo-controls{display:flex!important;flex-wrap:wrap}
+.workspace-search .top-actions{display:flex!important}
+.workspace-search .top-actions>:not(.search){display:none!important}
+body:has(.modal-wrap) .app>.main{visibility:hidden}
+/* Keep the navigation outside the function overlay so it remains clickable. */
+@media(min-width:951px){.modal-wrap{left:calc(max(0px, (100vw - 1600px) / 2) + 248px)}}
+@media(min-width:651px) and (max-width:950px){.modal-wrap{left:205px}}
+@media(max-width:650px){.modal-wrap{bottom:57px}.bottom-nav{z-index:5}}

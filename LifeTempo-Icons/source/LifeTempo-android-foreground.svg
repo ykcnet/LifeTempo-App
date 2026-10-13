@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024"><defs>
+<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6C5CE7"/><stop offset="1" stop-color="#00B8D9"/></linearGradient>
+<linearGradient id="wave" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#6C5CE7"/><stop offset="1" stop-color="#00B8D9"/></linearGradient>
+<clipPath id="card"><rect x="232" y="268" width="560" height="520" rx="72"/></clipPath>
+</defs><g transform="translate(512,512) scale(0.68) translate(-512,-500)"><g>
+<rect x="232" y="268" width="560" height="520" rx="72" fill="#fff"/>
+<rect x="232" y="268" width="560" height="140" fill="#FF6B6B" clip-path="url(#card)"/>
+<rect x="344" y="212" width="64" height="128" rx="32" fill="#2D2A6E"/>
+<rect x="616" y="212" width="64" height="128" rx="32" fill="#2D2A6E"/>
+<polyline points="288,610 392,610 452,500 524,716 588,560 628,610 736,610" fill="none" stroke="url(#wave)" stroke-width="42" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="736" cy="610" r="0" fill="#fff"/>
+</g></g></svg>

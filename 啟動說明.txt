@@ -1,0 +1,23 @@
+LifeTempo 啟動說明
+====================
+
+重要：請不要直接打開 index.html 檔案！
+
+正確的啟動方式：
+
+1. 開啟終端機（Terminal 或命令提示字元）
+2. 切換到 LifeTempo-App 目錄：
+   cd C:\Users\user\LifeTempo-App
+3. 執行以下命令啟動服務器：
+   node server.mjs
+4. 服務器啟動後，在瀏覽器中訪問：
+   http://localhost:4173
+
+為什麼不能直接打開 index.html？
+- 直接從檔案系統打開會導致 CORS 錯誤
+- JavaScript 功能無法正常運作
+- API 調用會失敗
+
+如果無法啟動服務器：
+- 確保已安裝 Node.js（建議版本 18 或更高）
+- 在終端機執行 node --version 檢查版本
