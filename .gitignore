@@ -5,3 +5,7 @@ node_modules/
 local.properties
 .idea/
 _site/
+android-apk-kit/private/
+android-apk-kit/toolchain/
+android-apk-kit/cache/
+android-apk-kit/output/

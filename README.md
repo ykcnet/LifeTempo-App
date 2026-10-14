@@ -75,6 +75,8 @@ GitHub Pages 僅提供本機儲存的 PWA 前端；Node／SQLite 預約服務、
 
 使用 Android Studio 開啟 `android/` 並執行 App。首次開啟後，長按手機主畫面空白處，選擇「小工具 → LifeTempo」，加入「月曆」、「今日行程」或「待辦事項」；加入後可拖曳邊緣調整寬、高。月曆標示當日及有行程日期，點擊月曆 Widget 會開啟 App 月視圖。Widget 快照僅在本機保存，Android Auto Backup 已關閉。
 
+Windows APK 建置工具、JDK、Gradle、Android SDK 與 LifeTempo 簽署金鑰的集中管理流程見 `android-apk-kit/README.md`。首次準備會下載工具鏈並要求使用者確認 Android SDK 授權；簽署金鑰密碼由 Windows DPAPI 保護。
+
 ## 尚需服務端或原生 App 的部分
 
 PRD 的以下能力不能只靠靜態單機 HTML 完成，目前不會假稱已提供：

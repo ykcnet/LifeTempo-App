@@ -25,6 +25,42 @@
 .workspace-function .main>.todo-controls{display:flex!important;flex-wrap:wrap}
 .workspace-search .top-actions{display:flex!important}
 .workspace-search .top-actions>:not(.search){display:none!important}
+/* Ensure calendar view always shows all controls */
+.workspace-calendar .main>.viewbar,
+.workspace-calendar .main>.tool-row,
+.workspace-calendar .main>.local-source,
+.workspace-calendar .hero-actions,
+.workspace-calendar .hero .eyebrow,
+.workspace-calendar .hero p,
+.workspace-calendar .top-actions{display:flex!important}
+/* Ensure consistent day-col background in calendar view */
+.workspace-calendar .day-col{background:repeating-linear-gradient(to bottom,transparent 0,transparent 56px,#eff0f5 56px,#eff0f5 57px);border-left:1px solid #f0f1f6}
+body.dark .workspace-calendar .day-col{background:repeating-linear-gradient(to bottom,transparent 0,transparent 56px,#34394b 56px,#34394b 57px);border-left:1px solid #34394b}
+/* Ensure consistent day-head styling in calendar view - override any conflicting styles */
+.workspace-calendar .day-head{background:#fff !important;border-bottom:1px solid var(--line) !important;padding:13px 6px !important;text-align:center !important;color:#898fa0 !important;font-size:10px !important}
+.workspace-calendar .day-head strong{display:block !important;margin:6px auto 0 !important;width:26px !important;height:26px !important;line-height:26px !important;border-radius:50% !important;font-size:12px !important;color:var(--ink) !important}
+body.dark .workspace-calendar .day-head{background:#222635 !important;border-bottom:1px solid #34394b !important;color:var(--muted) !important}
+body.dark .workspace-calendar .day-head strong{color:#d9dcef !important}
+/* Fix navigation button layout and add color differentiation */
+.nav{display:flex;flex-direction:column;gap:4px !important}
+.nav button{display:flex;align-items:center;gap:8px;padding:10px 11px;border-radius:9px;border:0;background:transparent;text-align:left;color:#777e91;font:500 12px inherit;cursor:pointer;position:relative;white-space:nowrap}
+.nav button .icon{width:25px;font-size:15px;flex-shrink:0}
+.nav button .help-btn{width:20px;height:20px;min-width:20px;padding:0;margin:0;margin-left:auto;font-size:12px;border-radius:50%;border:1px solid var(--line);background:var(--bg);color:var(--muted);flex-shrink:0}
+.nav button .help-btn:hover{background:var(--purple);color:#fff;border-color:var(--purple}
+.nav button .help-btn + .help-btn{display:none}
+/* Color differentiation for navigation buttons */
+.nav #aiPlanNav{background:linear-gradient(135deg,#f093fb22 0%,#f5576c22 100%);color:#f5576c;font-weight:600}
+.nav [data-goview="週"]{color:#6c5ce7}
+.nav [data-goview="待辦"]{color:#12b8bb}
+.nav [data-goview="預約"]{color:#ff777c}
+.nav [data-goview="共享"]{color:#70a7f9}
+.nav [data-goview="設定"]{color:#e4a849}
+body.dark .nav #aiPlanNav{background:linear-gradient(135deg,#f093fb33 0%,#f5576c33 100%);color:#ff8fa3}
+body.dark .nav [data-goview="週"]{color:#a99aef}
+body.dark .nav [data-goview="待辦"]{color:#a7eed5}
+body.dark .nav [data-goview="預約"]{color:#ffb2b8}
+body.dark .nav [data-goview="共享"]{color:#b8c5ff}
+body.dark .nav [data-goview="設定"]{color:#ffe0a3}
 body:has(.modal-wrap) .app>.main{visibility:hidden}
 /* Keep the navigation outside the function overlay so it remains clickable. */
 @media(min-width:951px){.modal-wrap{left:calc(max(0px, (100vw - 1600px) / 2) + 248px)}}
