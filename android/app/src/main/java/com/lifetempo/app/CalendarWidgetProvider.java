@@ -8,15 +8,17 @@ import android.os.Bundle;
 public final class CalendarWidgetProvider extends AppWidgetProvider {
     static final String ACTION_PREVIOUS_MONTH = "com.ykcnet.lifetempo.widget.PREVIOUS_MONTH";
     static final String ACTION_NEXT_MONTH = "com.ykcnet.lifetempo.widget.NEXT_MONTH";
+    static final String ACTION_TODAY = "com.ykcnet.lifetempo.widget.TODAY";
 
     @Override
     public void onReceive(Context context, android.content.Intent intent) {
         String action = intent.getAction();
-        if (ACTION_PREVIOUS_MONTH.equals(action) || ACTION_NEXT_MONTH.equals(action)) {
+        if (ACTION_PREVIOUS_MONTH.equals(action) || ACTION_NEXT_MONTH.equals(action) || ACTION_TODAY.equals(action)) {
             int id = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,
                     AppWidgetManager.INVALID_APPWIDGET_ID);
             if (id != AppWidgetManager.INVALID_APPWIDGET_ID) {
-                HomeWidgetRenderer.shiftCalendarMonth(context, id,
+                if (ACTION_TODAY.equals(action)) HomeWidgetRenderer.resetCalendarMonth(context, id);
+                else HomeWidgetRenderer.shiftCalendarMonth(context, id,
                         ACTION_PREVIOUS_MONTH.equals(action) ? -1 : 1);
             }
             return;

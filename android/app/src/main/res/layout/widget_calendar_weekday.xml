@@ -3,8 +3,6 @@
     android:layout_width="0dp"
     android:layout_height="match_parent"
     android:layout_weight="1"
-    android:layout_margin="1dp"
-    android:background="@drawable/widget_calendar_cell"
     android:gravity="center"
     android:textColor="#7D8492"
     android:textStyle="bold" />

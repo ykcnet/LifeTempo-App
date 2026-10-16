@@ -15,4 +15,11 @@ public final class LifeTempoWidgetBridge {
         if (eventsJson == null || tasksJson == null || eventsJson.length() > 1_000_000 || tasksJson.length() > 250_000) return;
         WidgetDataStore.update(context, eventsJson, tasksJson, weekStart);
     }
+
+    @JavascriptInterface
+    public void updateSnapshot(String eventsJson, String tasksJson, int weekStart, String daysJson) {
+        if (eventsJson == null || tasksJson == null || eventsJson.length() > 1_000_000 || tasksJson.length() > 250_000) return;
+        if (daysJson != null && daysJson.length() > 200_000) daysJson = null;
+        WidgetDataStore.update(context, eventsJson, tasksJson, weekStart, daysJson);
+    }
 }

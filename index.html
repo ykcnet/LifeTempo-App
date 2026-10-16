@@ -236,9 +236,20 @@ function syncAndroidWidgets(){
   try{
     const start=new Date(today.getFullYear(),today.getMonth(),1),end=new Date(today);end.setDate(end.getDate()+30);
     const upcoming=expandEvents(start,end).slice(0,120).map(event=>({title:event.title,date:event.displayDate||event.occurrence||event.date,start:event.start||'',allDay:!!event.allDay,color:color(event)}));
-    bridge.updateSnapshot(JSON.stringify(upcoming),JSON.stringify(tasks.filter(task=>!task.done).slice(0,100)),LocalCalendar.settings.weekStart);
+    bridge.updateSnapshot(JSON.stringify(upcoming),JSON.stringify(tasks.filter(task=>!task.done).slice(0,100)),LocalCalendar.settings.weekStart,JSON.stringify(widgetDayInfo()));
   }catch{}
 }
+function widgetDayInfo(){
+  const out={},s=LocalCalendar.settings,from=new Date(today.getFullYear(),today.getMonth()-3,1),to=new Date(today.getFullYear(),today.getMonth()+9,1);
+  for(let d=new Date(from);d<to;d.setDate(d.getDate()+1)){
+    const key=LocalCalendar.dateKey(d),h=LocalCalendar.holiday(d,s.region),term=s.terms?LocalCalendarData.terms[key]:'';
+    let lunar='';if(s.lunar){const full=LocalCalendar.lunar(d);lunar=full.endsWith('初一')?full:full.replace(/^.*月(?=.)/,'')}
+    const weekend=[0,6].includes(d.getDay()),off=h?(h.off?1:0):(weekend?1:0),name=h?.name||'',sub=name||term||lunar;
+    out[key]={s:sub,o:off,x:name||term?1:0};
+  }
+  return out;
+}
+
 const widgetLaunch=new URLSearchParams(location.search).get('widget');
 if(widgetLaunch==='todo')view='待辦';else if(widgetLaunch==='today')view='日';else if(widgetLaunch==='calendar')view='月';
 function color(e){return COLORS[e.category]||COLORS.其他}

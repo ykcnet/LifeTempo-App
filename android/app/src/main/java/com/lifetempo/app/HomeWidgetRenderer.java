@@ -18,6 +18,7 @@ import java.util.List;
 
 final class HomeWidgetRenderer {
     private static final String CALENDAR_MONTH_KEY = "calendarMonth.";
+    private static final int COLOR_OFF = 0xFFD64545;
 
     private HomeWidgetRenderer() {}
 
@@ -47,6 +48,9 @@ final class HomeWidgetRenderer {
             }
         } catch (Exception ignored) {}
 
+        JSONObject dayInfo = new JSONObject();
+        try { dayInfo = new JSONObject(WidgetDataStore.days(context)); } catch (Exception ignored) {}
+
         LocalDate today = LocalDate.now();
         int weekStart = context.getSharedPreferences("lifetempo_widgets", Context.MODE_PRIVATE)
                 .getInt("weekStart", 0);
@@ -59,9 +63,10 @@ final class HomeWidgetRenderer {
             Bundle options = manager.getAppWidgetOptions(id);
             int minWidth = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 250);
             int minHeight = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 200);
-            float dayTextSize = minWidth < 230 ? 9f : 12f;
-            float weekdayTextSize = minWidth < 230 ? 8f : 10f;
-            if (minHeight < 150) dayTextSize = 8f;
+            float dayTextSize = minWidth < 230 ? 10f : 12f;
+            float weekdayTextSize = minWidth < 230 ? 9f : 11f;
+            float subTextSize = minWidth < 230 ? 7f : 8f;
+            if (minHeight < 150) dayTextSize = 9f;
             int eventLimit = minHeight < 270 ? 1 : minHeight < 420 ? 2 : 3;
 
             RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_calendar);
@@ -70,6 +75,8 @@ final class HomeWidgetRenderer {
                     calendarMonthIntent(context, id, CalendarWidgetProvider.ACTION_PREVIOUS_MONTH, false));
                 views.setOnClickPendingIntent(R.id.calendar_month_next,
                     calendarMonthIntent(context, id, CalendarWidgetProvider.ACTION_NEXT_MONTH, true));
+                views.setOnClickPendingIntent(R.id.calendar_month_today,
+                    calendarMonthIntent(context, id, CalendarWidgetProvider.ACTION_TODAY, false));
 
             String[] weekdays = weekStart == 1
                     ? new String[]{"一", "二", "三", "四", "五", "六", "日"}
@@ -79,6 +86,7 @@ final class HomeWidgetRenderer {
                 RemoteViews label = new RemoteViews(context.getPackageName(), R.layout.widget_calendar_weekday);
                 label.setTextViewText(R.id.calendar_weekday, weekday);
                 label.setTextViewTextSize(R.id.calendar_weekday, 2, weekdayTextSize);
+                if (weekday.equals("日") || weekday.equals("六")) label.setTextColor(R.id.calendar_weekday, COLOR_OFF);
                 views.addView(R.id.calendar_weekdays, label);
             }
 
@@ -91,10 +99,21 @@ final class HomeWidgetRenderer {
                     List<JSONObject> dayEvents = eventsByDate.getOrDefault(date.toString(), new ArrayList<>());
                     cell.setTextViewText(R.id.calendar_day, String.valueOf(date.getDayOfMonth()));
                     cell.setTextViewTextSize(R.id.calendar_day, 2, dayTextSize);
-                    int textColor = date.getYear() == today.getYear() && date.getMonth() == today.getMonth() ? 0xFF303744 : 0xFF9AA1AE;
+                    int textColor = date.getYear() == displayedMonth.getYear() && date.getMonth() == displayedMonth.getMonth() ? 0xFF303744 : 0xFFB3B9C4;
+                    JSONObject info = dayInfo.optJSONObject(date.toString());
+                    boolean weekend = date.getDayOfWeek().getValue() >= 6;
+                    boolean off = info != null ? info.optInt("o", weekend ? 1 : 0) == 1 : weekend;
+                    String sub = info == null ? "" : info.optString("s", "");
+                    boolean special = info != null && info.optInt("x", 0) == 1;
+                    boolean inMonth = date.getMonth() == displayedMonth.getMonth();
+                    if (off && inMonth) textColor = COLOR_OFF;
+                    else if (off) textColor = 0xFFE8B4B0;
                     if (date.equals(today)) textColor = Color.WHITE;
                     cell.setTextColor(R.id.calendar_day, textColor);
-                    cell.setInt(R.id.calendar_day_cell, "setBackgroundResource", R.drawable.widget_calendar_cell);
+                    cell.setTextViewText(R.id.calendar_sub, sub);
+                    cell.setTextViewTextSize(R.id.calendar_sub, 2, subTextSize);
+                    cell.setTextColor(R.id.calendar_sub, !inMonth ? 0xFFB3B9C4 : special ? (off ? COLOR_OFF : 0xFF2E7D4F) : 0xFF8A91A0);
+                    cell.setInt(R.id.calendar_day_cell, "setBackgroundResource", off && inMonth ? R.drawable.widget_calendar_off : R.drawable.widget_calendar_cell);
                     cell.setInt(R.id.calendar_day, "setBackgroundResource", date.equals(today) ? R.drawable.widget_calendar_today : 0);
                     int visibleEvents = Math.min(dayEvents.size(), eventLimit);
                     if (dayEvents.size() > eventLimit && visibleEvents > 0) visibleEvents--;
@@ -127,6 +146,12 @@ final class HomeWidgetRenderer {
         }
     }
 
+    static void resetCalendarMonth(Context context, int id) {
+        context.getSharedPreferences("lifetempo_widgets", Context.MODE_PRIVATE).edit()
+                .remove(CALENDAR_MONTH_KEY + id).apply();
+        updateCalendar(context, AppWidgetManager.getInstance(context), new int[]{id});
+    }
+
     static void shiftCalendarMonth(Context context, int id, int amount) {
         LocalDate today = LocalDate.now();
         LocalDate nextMonth = displayedCalendarMonth(context, id, today).plusMonths(amount);
@@ -146,11 +171,12 @@ final class HomeWidgetRenderer {
     }
 
     private static PendingIntent calendarMonthIntent(Context context, int id, String action, boolean next) {
-        String direction = next ? "next" : "previous";
+        String direction = CalendarWidgetProvider.ACTION_TODAY.equals(action) ? "today" : next ? "next" : "previous";
         Intent intent = new Intent(context, CalendarWidgetProvider.class).setAction(action)
                 .setData(Uri.parse("lifetempo://calendar/" + id + "/" + direction))
                 .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id);
-        return PendingIntent.getBroadcast(context, id * 2 + (next ? 1 : 0), intent,
+        int slot = CalendarWidgetProvider.ACTION_TODAY.equals(action) ? 2 : next ? 1 : 0;
+        return PendingIntent.getBroadcast(context, id * 3 + slot, intent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
 

@@ -16,7 +16,9 @@
   function lunar(date){
     try{
       const parts=new Intl.DateTimeFormat('zh-TW-u-ca-chinese',{month:'long',day:'numeric'}).formatToParts(date);
-      const month=parts.find(p=>p.type==='month')?.value||'',day=Number(parts.find(p=>p.type==='day')?.value);
+      const rawMonth=parts.find(p=>p.type==='month')?.value||'',day=Number(parts.find(p=>p.type==='day')?.value);
+      const m=/^M?0*(\d{1,2})(bis)?$/i.exec(rawMonth),names=['','正','二','三','四','五','六','七','八','九','十','十一','臘'];
+      const month=m?(m[2]?'閏':'')+names[Number(m[1])]+'月':rawMonth;
       const official=scope.LocalCalendarData?.lunarDays[dateKey(date)];
       const digits=['','一','二','三','四','五','六','七','八','九'];
       const label=official?(official.includes('月')?'初一':official):day===10?'初十':day===20?'二十':day===30?'三十':day<10?'初'+digits[day]:day<20?'十'+digits[day-10]:'廿'+digits[day-20];
