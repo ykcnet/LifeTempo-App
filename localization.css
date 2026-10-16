@@ -21,6 +21,7 @@
 .workspace-function .hero .eyebrow,
 .workspace-function .hero p,
 .workspace-function .top-actions{display:none!important}
+.workspace-function .main>.tool-row:has(#createCalendar){display:flex!important;flex-wrap:wrap}
 .workspace-function .hero{margin-bottom:18px}
 .workspace-function .main>.todo-controls{display:flex!important;flex-wrap:wrap}
 .workspace-search .top-actions{display:flex!important}
@@ -43,6 +44,7 @@ body.dark .workspace-calendar .day-head{background:#222635 !important;border-bot
 body.dark .workspace-calendar .day-head strong{color:#d9dcef !important}
 /* Fix navigation button layout and add color differentiation */
 .nav{display:flex;flex-direction:column;gap:4px !important}
+@media(min-width:651px){.sidebar{position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto}}
 .nav button{display:flex;align-items:center;gap:8px;padding:10px 11px;border-radius:9px;border:0;background:transparent;text-align:left;color:#777e91;font:500 12px inherit;cursor:pointer;position:relative;white-space:nowrap}
 .nav button .icon{width:25px;font-size:15px;flex-shrink:0}
 .nav button .help-btn{width:20px;height:20px;min-width:20px;padding:0;margin:0;margin-left:auto;font-size:12px;border-radius:50%;border:1px solid var(--line);background:var(--bg);color:var(--muted);flex-shrink:0}
@@ -66,3 +68,15 @@ body:has(.modal-wrap) .app>.main{visibility:hidden}
 @media(min-width:951px){.modal-wrap{left:calc(max(0px, (100vw - 1600px) / 2) + 248px)}}
 @media(min-width:651px) and (max-width:950px){.modal-wrap{left:205px}}
 @media(max-width:650px){.modal-wrap{bottom:57px}.bottom-nav{z-index:5}}
+
+.day-head.is-today{background:#e6f4f1!important}
+.day-head.is-today strong,.month-cell.is-today .month-day{background:#138a91!important;color:#fff!important;border-radius:50%;min-width:32px;min-height:32px;display:inline-flex;align-items:center;justify-content:center}
+.month-cell.is-today{background:#e6f4f1!important}
+.agenda-category{display:inline-block;margin-left:7px;padding:0 5px;border:1px solid;border-radius:4px;font-size:.75rem;line-height:1.5;vertical-align:middle}
+body.dark .day-head.is-today,body.dark .month-cell.is-today{background:#203a37!important}
+body.dark .day-head.is-today strong,body.dark .month-cell.is-today .month-day{background:#138a91!important;color:#fff!important}
+body.dark .agenda-category{background:#20252d!important}
+@media(max-width:650px){
+	.month-cell.is-today .month-day{background:transparent!important;color:var(--ink)!important}
+	.month-cell.is-today .month-day-number{background:#138a91!important;color:#fff!important}
+}

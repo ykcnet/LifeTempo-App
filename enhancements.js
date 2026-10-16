@@ -21,8 +21,102 @@ expandEvents=function(from,to,zone=selectedTz){
 };
 
 const originalRender = render;
+let lastRenderedView=view;
+const pageViewBack = [];
+const pageViewForward = [];
+let homeScroll = false;
+const isMobileExperience = () => !!window.LifeTempoWidget || location.hostname === 'appassets.androidplatform.net' || !!window.matchMedia?.('(max-width:650px)').matches;
+function prepareBottomNavigation(nextView){
+  query='';
+  if(nextView==='日')cursor=new Date(today);
+}
+function scrollNavigationToTop(){
+  requestAnimationFrame(()=>{
+    const home=typeof homeScroll!=='undefined'&&homeScroll;
+    const grid=home?null:document.querySelector('.workspace-calendar .main>.card:not(.local-weather)');
+    if(grid?.scrollIntoView)return grid.scrollIntoView({block:'start',behavior:'smooth'});
+    window.scrollTo({top:0,behavior:'smooth'});
+    document.querySelector('.main')?.scrollTo?.({top:0,behavior:'smooth'});
+  });
+}
+document.addEventListener('click', event => {
+  const button = event.target.closest('.nav [data-goview],.bottom-nav [data-goview],.view-switch [data-view],.sidebar [data-mini],.cat-list [data-cat],.sidebar [data-calendar],#today,#prev,#next,#pageHome,#pagePrevious,#pageNext');
+  const nextView = button?.dataset.goview || button?.dataset.view;
+  if (button) {
+    homeScroll = button.id === 'pageHome';
+    query='';
+    if (button.matches('.bottom-nav [data-goview]')) prepareBottomNavigation(nextView);
+    if(!nextView||nextView===view)scrollNavigationToTop();
+  }
+  if (nextView && nextView !== view) {
+    pageViewBack.push(view);
+    pageViewForward.length = 0;
+  }
+}, true);
+function navigatePageView(nextView) {
+  if (nextView !== view) {
+    pageViewBack.push(view);
+    pageViewForward.length = 0;
+  }
+  view = nextView;
+  query = '';
+  homeScroll = false;
+  render();
+  scrollNavigationToTop();
+}
 render = function () {
+  const previousView=lastRenderedView;
+  if(view!==lastRenderedView)query='';
   originalRender();
+  lastRenderedView=view;
+  if(view!==previousView)scrollNavigationToTop();
+  document.querySelector(`.month-cell[data-day="${iso(today)}"]`)?.classList.add('is-today');
+  document.querySelectorAll('.agenda-item[data-edit]').forEach(item=>{
+    const event=events.find(entry=>entry.id===item.dataset.edit),title=item.querySelector('span');
+    if(!event||!title||title.querySelector('.agenda-category'))return;
+    const badge=document.createElement('small');
+    badge.className='agenda-category';badge.textContent=event.category||'其他';
+    badge.style.color=color(event);badge.style.borderColor=color(event);badge.style.backgroundColor=color(event)+'18';
+    title.append(badge);
+  });
+  document.querySelectorAll('.month-event[data-edit]').forEach(item=>{
+    const event=events.find(entry=>entry.id===item.dataset.edit);
+    if(event)item.style.setProperty('color',color(event),'important');
+  });
+  if (isMobileExperience()) document.querySelectorAll('.month-day').forEach(day => {
+    const text = day.firstChild;
+    if (text?.nodeType !== Node.TEXT_NODE || !text.textContent.trim()) return;
+    const number = document.createElement('span');
+    number.className = 'month-day-number';
+    number.textContent = text.textContent.trim();
+    text.replaceWith(number, document.createTextNode(' '));
+  });
+  const main = document.querySelector('.main');
+  if (main && !main.querySelector('.page-navigation')) {
+    const pageNav = document.createElement('nav');
+    pageNav.className = 'page-navigation';
+    pageNav.setAttribute('aria-label', '頁面導覽');
+    pageNav.innerHTML = '<button type="button" id="pageHome" aria-label="回首頁">⌂ 回首頁</button><button type="button" id="pagePrevious" aria-label="上一頁">‹ 上一頁</button><button type="button" id="pageNext" aria-label="下一頁">下一頁 ›</button>';
+    main.querySelector('.topbar')?.after(pageNav);
+    pageNav.querySelector('#pageHome').onclick = () => {
+      if (view !== '週') pageViewBack.push(view);
+      pageViewForward.length = 0;
+      view = '週'; query = ''; category = '全部'; calendarFilter = '';
+      homeScroll = true;
+      render();
+      window.scrollTo(0, 0);
+    };
+    pageNav.querySelector('#pagePrevious').onclick = () => {
+      if (!pageViewBack.length) return;
+      pageViewForward.push(view); view = pageViewBack.pop(); render();
+    };
+    pageNav.querySelector('#pageNext').onclick = () => {
+      if (!pageViewForward.length) return;
+      pageViewBack.push(view); view = pageViewForward.pop(); render();
+    };
+    pageNav.querySelector('#pagePrevious').disabled = !pageViewBack.length;
+    pageNav.querySelector('#pageNext').disabled = !pageViewForward.length;
+  }
   const workspaceNav = document.querySelector('.nav');
   const manageSharedButton = workspaceNav?.querySelector('[data-goview="共享"]');
   if (manageSharedButton) {
@@ -39,7 +133,7 @@ render = function () {
       sharedButton = document.createElement('button');
       sharedButton.dataset.goview = '共享行事曆';
       sharedButton.onclick = () => { view = '共享行事曆'; render(); };
-      workspaceNav.insertBefore(sharedButton, manageSharedButton);
+      workspaceNav.insertBefore(sharedButton, manageSharedButton.closest('.nav-item') || manageSharedButton);
     }
     sharedButton.className = view === '共享行事曆' ? 'active' : '';
     sharedButton.innerHTML = '<span class="icon">▧</span>共享行事曆';
@@ -67,14 +161,47 @@ render = function () {
     applySystemTheme();
   };
   if(view==='設定') {
+    if(isMobileExperience()){
+      const aiHeading=[...main.querySelectorAll('h3')].find(heading=>heading.textContent.trim()==='AI 設定');
+      let node=aiHeading;
+      while(node&&!(node.matches('h3')&&node.textContent.trim()==='通知')){const next=node.nextElementSibling;node.remove();node=next}
+    }
     const palettes=document.createElement('div');palettes.className='tool-row';
     palettes.innerHTML='<span>主題配色：</span>'+[['#6c5ce7','薰衣草'],['#138a91','湖水綠'],['#be526f','玫瑰']].map(([color,name])=>`<button data-accent="${color}">${name}</button>`).join('');
     $('.main .card')?.append(palettes);
     palettes.querySelectorAll('button').forEach(button=>button.onclick=()=>{localStorage.setItem('lifetempo.accent',button.dataset.accent);applyAccent()});
+    const syncState=window.LifeTempoCalendarSync?.getState()||{connected:false,status:'尚未連線同步伺服器',conflict:false};
+    const syncServerField=window.LifeTempoWidget?`<div class="field"><label for="calendarSyncServerUrl">同步伺服器 HTTPS 網址</label><input id="calendarSyncServerUrl" type="url" value="${esc(localStorage.getItem('lifetempo.calendarSyncServerUrl')||'')}" placeholder="https://calendar.example.com"><small>輸入可由這支手機連線、且與電腦使用相同的 LifeTempo 伺服器網址。</small></div>`:'';
+    const syncPanel=document.createElement('section');syncPanel.className='card agenda';syncPanel.id='calendarSyncPanel';
+    syncPanel.innerHTML=`<h3>手機與電腦同步</h3><p>行程、待辦、共享行事曆、分類、邀請管道與顯示時區會同步到 LifeTempo 伺服器；AI API Key 不會同步。每台裝置需連到同一台伺服器（網址可因 localhost／區網 IP 而不同），並輸入同一 owner token。資料包含私人行程：區網 HTTP 僅限可信任網路，跨網路請使用 HTTPS。</p>${syncServerField}<div class="tool-row"><button type="button" class="primary" id="calendarSyncConnect">${syncState.connected&&!window.LifeTempoWidget?'立即同步':'連線／同步伺服器'}</button>${syncState.connected?'<button type="button" id="calendarSyncReconnect">重新連線</button>':''}</div><p id="calendarSyncStatus" role="status">${esc(syncState.status)}</p><div id="calendarSyncConflict" ${syncState.conflict?'':'hidden'} role="alert"><p>手機與電腦都有尚未同步的修改。請明確選擇一份資料；選擇前不會覆蓋任何一端。</p><div class="tool-row"><button type="button" id="calendarSyncUseServer">載入伺服器版並取代本機資料</button><button type="button" id="calendarSyncKeepLocal">以本機資料覆蓋伺服器版</button></div></div>`;
+    if(window.LifeTempoWidget){
+      const aiSetup=document.createElement('div');aiSetup.className='field';
+      aiSetup.innerHTML='<label>Android AI 後端</label><small>一鍵連線此 HTTPS 伺服器，依已配置的 provider 自動設定 AI。owner token 僅保存在工作階段；AI API Key 會傳送至此自架伺服器。</small><button type="button" class="tool-row" id="androidAISetup">一鍵連線 AI</button><small id="androidAIStatus" role="status" aria-live="polite">內建 AI 不支援 Android WebView，可連線自架 AI 服務使用。</small>';
+      syncPanel.querySelector('#calendarSyncStatus')?.before(aiSetup);
+      aiSetup.querySelector('#androidAISetup').onclick=async event=>{
+        const button=event.currentTarget;button.disabled=true;button.textContent='正在連線…';
+        try{await connectAndroidAIBackend()}
+        finally{if(button.isConnected){button.disabled=false;button.textContent='一鍵連線 AI'}}
+      };
+    }
+    main?.append(syncPanel);
+    syncPanel.querySelector('#calendarSyncConnect').onclick=()=>syncState.connected&&!window.LifeTempoWidget?window.LifeTempoCalendarSync.sync():window.LifeTempoCalendarSync.connect();
+    syncPanel.querySelector('#calendarSyncReconnect')?.addEventListener('click',window.LifeTempoCalendarSync.reconnect);
+    syncPanel.querySelector('#calendarSyncUseServer')?.addEventListener('click',()=>{
+      if(confirm('載入伺服器資料會取代此裝置的行程、待辦與共享設定。確定繼續？'))window.LifeTempoCalendarSync.useServer();
+    });
+    syncPanel.querySelector('#calendarSyncKeepLocal')?.addEventListener('click',()=>{
+      if(confirm('以此裝置資料覆蓋伺服器版本後，其他裝置將同步使用這份資料。確定繼續？'))window.LifeTempoCalendarSync.keepLocal();
+    });
   }
   const more=document.createElement('button');more.textContent='☰ 更多';
   more.onclick=()=>{
-    openFormModal('工作區',`<div class="field full"><label>前往</label><select name="destination"><option>預約</option><option>共享</option><option>設定</option></select></div>`,'開啟',fd=>{view=fd.get('destination');render()});
+    openFormModal('工作區',`<div class="field full"><label>前往功能</label><select name="destination"><option value="週">日曆首頁</option><option value="待辦">待辦事項</option><option value="預約">空檔預約</option><option value="共享行事曆">共享行事曆</option><option value="共享">管理共享與權限</option><option value="設定">行事曆設定</option><option value="manage-categories">管理分類</option></select></div><div class="field full"><label>我的分類</label><select name="category"><option value="全部">所有行程</option>${Object.keys(COLORS).map(name=>`<option value="${esc(name)}">${esc(name)}</option>`).join('')}</select></div>`,'開啟',fd=>{
+      const destination=fd.get('destination');
+      if(destination==='manage-categories'){$('#actionWrap')?.remove();manageCategories();return false;}
+      category=fd.get('category')||'全部';calendarFilter='';
+      navigatePageView(destination);
+    });
   };
   $('.bottom-nav')?.append(more);
   applyAccent();
@@ -82,6 +209,15 @@ render = function () {
 function applyAccent(){const accent=localStorage.getItem('lifetempo.accent');if(/^#[a-f\d]{6}$/i.test(accent||''))document.documentElement.style.setProperty('--purple',accent);}
 
 const originalOpenModal = openModal;
+function unlinkDeletedTaskEvent(eventId,taskId) {
+  let changed=false;
+  tasks=tasks.map(task=>{
+    if(task.id!==taskId||task.eventId!==eventId)return task;
+    const updated={...task};delete updated.eventId;changed=true;return updated;
+  });
+  if(changed)saveTasks();
+  return changed;
+}
 openModal = function(event, defaults={}) {
   if(event&&!event.icsData&&event.repeat&&event.repeat!=='不重複'){
     const master=events.find(v=>v.id===event.id)||event;
@@ -99,6 +235,14 @@ openModal = function(event, defaults={}) {
   originalOpenModal(event, {timezone:event?.timezone||selectedTz,...defaults,attachments});
   const form=$('#form');
   if(!form) return;
+  const linkedTaskId=event?.sourceTaskId,linkedEventId=event?.id,deleteButton=$('#delete');
+  if(linkedTaskId&&linkedEventId&&deleteButton){
+    const deleteEvent=deleteButton.onclick;
+    deleteButton.onclick=function(...args){
+      deleteEvent?.apply(this,args);
+      if(!events.some(item=>item.id===linkedEventId))unlinkDeletedTaskEvent(linkedEventId,linkedTaskId);
+    };
+  }
   const zone=event?.timezone||selectedTz;
   if(event?.icsData&&event.repeat!=='不重複'){
     for(const name of ['repeat','interval','monthlyMode','monthlyOrdinal','until','weekdays'])for(const input of form.querySelectorAll('[name="'+name+'"]'))input.disabled=true;
@@ -167,7 +311,7 @@ document.addEventListener('click',event=>{
   render();
 },true);
 
-if ('serviceWorker' in navigator && ['http:','https:'].includes(location.protocol)) {
+if (!window.LifeTempoWidget && 'serviceWorker' in navigator && ['http:','https:'].includes(location.protocol)) {
   const appBase=new URL('./',document.baseURI);
   navigator.serviceWorker.register(new URL('sw.js',appBase),{scope:appBase.pathname}).catch(()=>toast('離線快取未啟用，請確認使用 localhost 或 HTTPS'));
 }
@@ -203,12 +347,13 @@ function loadGoogleIdentity(){
   if(!googleIdentityReady)googleIdentityReady=new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='https://accounts.google.com/gsi/client';script.onload=resolve;script.onerror=()=>{googleIdentityReady=null;script.remove();reject(Error('Google 授權元件載入失敗，請檢查網路'))};document.head.append(script)});
   return googleIdentityReady;
 }
-function openCalendarImport(){
+function openCalendarImport(options={}){
+  const desktopAI=options.desktopAI===true;
   $('#actionWrap')?.remove();
   const from=new Date(today);from.setFullYear(from.getFullYear()-1);
   const to=new Date(today);to.setFullYear(to.getFullYear()+1);
-  const state={step:1,source:'google',incoming:[],from:iso(from),to:iso(to),busy:false,run:0};
-  openFormModal('匯入自己的行事曆','<div id="importWizard" class="field full"></div>','關閉',()=>{});
+  const state={step:desktopAI?2:1,source:desktopAI?'desktop-ai':'google',incoming:[],from:iso(from),to:iso(to),busy:false,run:0};
+  openFormModal(desktopAI?'匯入桌面版 AI 規劃':'匯入自己的行事曆','<div id="importWizard" class="field full"></div>','關閉',()=>{});
   const wrap=$('#actionWrap'),panel=$('#importWizard');
   wrap.querySelector('.modal-actions').remove();
   wrap.onclick=event=>{if(event.target===wrap&&!state.busy)wrap.remove()};
@@ -250,15 +395,17 @@ function openCalendarImport(){
       }else{
         const guides={
           'google-file':'在電腦開啟 Google 日曆 → 設定 → 匯入及匯出 → 匯出。解壓縮下載的 ZIP，選擇你要匯入的 .ics 檔案。',
+          'desktop-ai':'選擇桌面版 AI 規劃頁「匯出規劃給手機」產生的 JSON 檔案。',
           outlook:'先從 Outlook 匯出要使用的行事曆為 .ics 檔案；桌面版可在行事曆的「檔案 → 儲存行事曆」選擇日期範圍。此版本尚未提供 Microsoft 帳號直接連線。',
           apple:'在 Mac 開啟「行事曆」，選取要匯出的行事曆 → 檔案 → 輸出 → 輸出，儲存為 .ics 檔案。',
           other:'在原本的行事曆 App 尋找「匯出」或「備份」，選擇 iCalendar（.ics）格式。若沒有此功能，請先向該 App 確認是否支援匯出。',
           backup:'選擇之前從 LifeTempo 匯出的 JSON 備份。此流程只匯入事件至個人行事曆，不覆寫設定、待辦或共享權限。'
         };
-        content.innerHTML=`<h3 tabindex="-1">準備並選擇行事曆檔案</h3><p>1. ${guides[state.source]}</p><p>2. 選擇檔案。<br>3. 下一步檢查事件數量與內容後，再確認匯入。</p><div class="field"><label for="wizardFile">${state.source==='backup'?'JSON 備份':'ICS 行事曆檔案'}</label><input id="wizardFile" type="file" accept="${state.source==='backup'?'.json':'.ics'}"></div><p>ZIP 請先解壓縮。若有多個行事曆，可逐一匯入。</p>`;
+        const jsonImport=['backup','desktop-ai'].includes(state.source);
+        content.innerHTML=`<h3 tabindex="-1">準備並選擇行事曆檔案</h3><p>1. ${guides[state.source]}</p><p>2. 選擇檔案。<br>3. 下一步檢查事件數量與內容後，再確認匯入。</p><div class="field"><label for="wizardFile">${jsonImport?'JSON 規劃檔':'ICS 行事曆檔案'}</label><input id="wizardFile" type="file" accept="${jsonImport?'.json':'.ics'}"></div><p>ZIP 請先解壓縮。若有多個行事曆，可逐一匯入。</p>`;
         panel.querySelector('#wizardFile').onchange=async event=>{
           const file=event.target.files[0];if(!file)return;const run=++state.run;lock(true);status('正在讀取檔案，尚未儲存…');
-          try{const text=await CalendarICS.readFile(file);const incoming=prepareCalendarFile(file.name,text,state.source==='backup');if(!active(run))return;state.incoming=incoming;state.busy=false;state.step=3;draw()}catch(error){if(active(run)){lock(false);status(error.message)}}
+          try{const text=await CalendarICS.readFile(file);const incoming=prepareCalendarFile(file.name,text,jsonImport);if(!active(run))return;state.incoming=incoming;state.busy=false;state.step=3;draw()}catch(error){if(active(run)){lock(false);status(error.message)}}
         };
       }
     }else if(state.step===3){
@@ -267,7 +414,7 @@ function openCalendarImport(){
       if(!state.incoming.length)status('沒有可匯入的事件，請回上一步調整範圍或選擇其他檔案。');
       button('confirmCalendarImport',()=>{lock(true);try{commitCalendarImport(state.incoming);state.busy=false;state.step=4;draw()}catch{lock(false);status('儲存失敗，請釋放瀏覽器空間後重試。原有事件未變更。')}});
     }else{
-      content.innerHTML=`<h3 tabindex="-1">匯入完成</h3><p>已將 ${state.incoming.length} 筆事件匯入個人行事曆。</p><p>來源行事曆後續有變動時，可再次匯入。</p><button type="button" class="primary" id="showImportedCalendar">查看個人行事曆</button>`;
+      content.innerHTML=`<h3 tabindex="-1">匯入完成</h3><p>已將 ${state.incoming.length} 筆${desktopAI?'桌面版 AI 規劃':'事件'}匯入個人行事曆。</p><p>${desktopAI?'下次桌面版重新規劃時，可再次匯入新檔案。':'來源行事曆後續有變動時，可再次匯入。'}</p><button type="button" class="primary" id="showImportedCalendar">查看個人行事曆</button>`;
       panel.querySelector('#importClose').hidden=true;
       button('showImportedCalendar',()=>{calendarFilter='personal';category='全部';query='';attendeeFilter='';view='月';if(state.incoming[0])cursor=parse(state.incoming[0].date);wrap.remove();render()});
     }
@@ -275,6 +422,7 @@ function openCalendarImport(){
   }
   function lock(value){state.busy=value;panel.querySelectorAll('button,input,select').forEach(node=>node.disabled=value)}
   draw();
+  if(desktopAI)panel.querySelector('#wizardFile')?.click();
 }
 function prepareCalendarFile(name,text,isBackup){
   try{
@@ -315,6 +463,10 @@ const renderBeforeCalendarImport=render;
 render=function(){
   renderBeforeCalendarImport();
   if($('#import'))$('#import').onclick=openCalendarImport;
+  if(isMobileExperience()&&$('#aiPlanBtn')){
+    $('#aiPlanBtn').textContent='匯入桌面版 AI 規劃';
+    $('#aiPlanBtn').onclick=()=>openCalendarImport({desktopAI:true});
+  }
   const bar=$('#clearCalendarFilter')?.parentElement;
   if(bar&&(!calendarFilter||calendarFilter==='personal')){
     const button=document.createElement('button');button.textContent='匯入其他行事曆';button.onclick=openCalendarImport;bar.append(button);

@@ -37,11 +37,50 @@ test('AI planner opens and wires the generate button without runtime exceptions'
   const html=fs.readFileSync(new URL('./index.html',import.meta.url),'utf8');
   const nodes=new Map();
   const node=key=>{if(!nodes.has(key))nodes.set(key,{style:{},value:'',textContent:''});return nodes.get(key)};
-  const ctx=vm.createContext({today:new Date(2026,9,9),localStorage:{getItem:()=>null},AI_PROVIDERS:[{value:'gemini',label:'Gemini',models:[{id:'test'}]}],root:{insertAdjacentHTML(){}},iso:()=> '2026-10-10',esc:String,COLORS:{工作:'#fff'},calendars:[],calendarFilter:'',document:{querySelector:node,getElementById:node},$:node,window:{},location:{protocol:'file:'}});
+  const ctx=vm.createContext({today:new Date(2026,9,9),localStorage:{getItem:()=>null},AI_PROVIDERS:[{value:'browser',label:'瀏覽器內建 AI',models:[]}],getDefaultAIProvider:()=> 'browser',root:{insertAdjacentHTML(){}},iso:()=> '2026-10-10',esc:String,COLORS:{工作:'#fff'},calendars:[],calendarFilter:'',document:{querySelector:node,getElementById:node},$:node,window:{},location:{protocol:'file:'}});
   vm.runInContext(html.slice(html.indexOf('function openAIPlan()'),html.indexOf('function genMockPlanClient')),ctx);
   assert.doesNotThrow(()=>ctx.openAIPlan());
   assert.equal(typeof node('#aiPlanWrap #aiGenerate').onclick,'function');
   assert.match(node('#aiPlanWrap #aiStatusTip').textContent,/瀏覽器內建 AI/);
+});
+
+test('AI planner displays the same default provider selected by settings',()=>{
+  const html=fs.readFileSync(new URL('./index.html',import.meta.url),'utf8');
+  const nodes=new Map(),node=key=>{if(!nodes.has(key))nodes.set(key,{style:{},value:'',textContent:'',setAttribute(){},focus(){},scrollIntoView(){}});return nodes.get(key)};
+  const root={insertAdjacentHTML(_where,markup){this.markup=markup}};
+  const ctx=vm.createContext({today:new Date(2026,9,9),localStorage:{getItem:()=>null},AI_PROVIDERS:[{value:'gemini',label:'Gemini',models:[{id:'test'}]}],getDefaultAIProvider:()=> 'gemini',root,iso:()=> '2026-10-10',esc:String,COLORS:{工作:'#fff'},calendars:[],calendarFilter:'',document:{querySelector:node,getElementById:node},$:node,window:{},location:{protocol:'http:'}});
+  vm.runInContext(html.slice(html.indexOf('function openAIPlan()'),html.indexOf('function genMockPlanClient')),ctx);
+  ctx.openAIPlan();
+  assert.match(root.markup,/目前使用：Gemini/);
+});
+
+test('desktop AI plan export contains only the reviewed itinerary events',()=>{
+  const html=fs.readFileSync(new URL('./index.html',import.meta.url),'utf8');
+  const start=html.indexOf('function exportAIPlanForMobile('),end=html.indexOf('\n}',start)+2;
+  let exported,filename,mimeType,message;
+  const events=[{title:'赤崁樓',date:'2026-10-24',start:'09:00',end:'10:30'}];
+  const ctx=vm.createContext({aiPlanState:{events},today:new Date(2026,9,15),iso:()=> '2026-10-15',download:(name,text,type)=>{filename=name;exported=JSON.parse(text);mimeType=type},toast:value=>message=value});
+  vm.runInContext(html.slice(start,end)+';exportAIPlanForMobile()',ctx);
+  assert.equal(filename,'lifetempo-ai-plan-2026-10-15.json');
+  assert.equal(mimeType,'application/json');
+  assert.deepEqual(exported.events,events);
+  assert.equal(Object.hasOwn(exported,'tasks'),false);
+  assert.match(message,/已匯出/);
+});
+
+test('mobile planner preserves the saved browser AI provider when the device API is unsupported',async()=>{
+  const html=fs.readFileSync(new URL('./index.html',import.meta.url),'utf8');
+  const nodes=new Map(),node=key=>{if(!nodes.has(key))nodes.set(key,{style:{},value:'',textContent:'',checked:false,setAttribute(){},focus(){},scrollIntoView(){}});return nodes.get(key)};
+  const root={insertAdjacentHTML(_where,markup){this.markup=markup}};
+  let requestedProvider;
+  const ctx=vm.createContext({today:new Date(2026,9,9),localStorage:{getItem:()=>JSON.stringify({provider:'browser'})},AI_PROVIDERS:[{value:'browser',label:'瀏覽器內建 AI',models:[]},{value:'gemini',label:'Gemini',models:[{id:'test'}]}],getDefaultAIProvider:()=> 'gemini',BrowserAI:{isSupported:()=>false,generate:async payload=>{requestedProvider=payload.provider;throw Error('此瀏覽器尚未提供內建 AI')}},AIPlanner:{},root,iso:()=> '2026-10-10',esc:String,COLORS:{旅遊:'#fff'},calendars:[],calendarFilter:'',document:{querySelector:node,getElementById:node},$:node,window:{matchMedia:()=>({matches:true})},location:{protocol:'http:'},AIRequest:{parse:()=>({})}});
+  vm.runInContext(html.slice(html.indexOf('function openAIPlan()'),html.indexOf('function genMockPlanClient')),ctx);
+  ctx.openAIPlan();
+  const field=id=>node('#aiPlanWrap #'+id);
+  field('aiPrompt').value='安排台南行程';field('aiStart').value='2026-10-10';field('aiEnd').value='2026-10-10';field('aiCategory').value='旅遊';
+  assert.match(root.markup,/目前使用：瀏覽器內建 AI/);
+  await field('aiGenerate').onclick();
+  assert.equal(requestedProvider,'browser');
 });
 test('travel fallback uses sightseeing rather than work and respects busy slots',()=>{
   const html=fs.readFileSync(new URL('./index.html',import.meta.url),'utf8');
@@ -84,12 +123,14 @@ test('generate click shows progress and actionable failure, then allows retry',a
   const nodes=new Map();
   const node=key=>{if(!nodes.has(key))nodes.set(key,{style:{},value:'',textContent:'',setAttribute(){},focus(){},scrollIntoView(){}});return nodes.get(key)};
   let finish;
-  const ctx=vm.createContext({today:new Date(2026,9,9),localStorage:{getItem:()=>JSON.stringify({provider:'gemini'})},AI_PROVIDERS:[{value:'gemini',label:'Gemini',models:[{id:'test'}]}],root:{insertAdjacentHTML(){}},iso:()=> '2026-10-10',esc:String,COLORS:{旅遊:'#fff'},calendars:[],calendarFilter:'',document:{querySelector:node,getElementById:node},$:node,window:{},location:{protocol:'http:'},AIRequest:{parse:()=>({})},AbortSignal,fetch:()=>new Promise(resolve=>{finish=resolve})});
+  const ctx=vm.createContext({today:new Date(2026,9,9),localStorage:{getItem:()=>JSON.stringify({provider:'gemini'})},AI_PROVIDERS:[{value:'gemini',label:'Gemini',models:[{id:'test'}]}],getDefaultAIProvider:()=> 'gemini',root:{insertAdjacentHTML(){}},iso:()=> '2026-10-10',esc:String,COLORS:{旅遊:'#fff'},calendars:[],calendarFilter:'',document:{querySelector:node,getElementById:node},$:node,window:{},location:{protocol:'http:'},AIRequest:{parse:()=>({})},AbortSignal,fetch:()=>new Promise(resolve=>{finish=resolve})});
   vm.runInContext(html.slice(html.indexOf('function openAIPlan()'),html.indexOf('function genMockPlanClient')),ctx);
   ctx.openAIPlan();
   const field=id=>node('#aiPlanWrap #'+id);
+  field('aiStart').value='2026-10-10';field('aiEnd').value='2026-10-10';
+  field('aiCategory').value='旅遊';
   await field('aiGenerate').onclick();
-  assert.match(field('aiStatusTip').textContent,/請先填寫/);
+  assert.match(field('aiStatusTip').textContent,/請填寫行程需求描述/);
   field('aiPrompt').value='台南旅遊';
   field('aiStart').value='2026-10-10';field('aiEnd').value='2026-10-11';
   const pending=field('aiGenerate').onclick();
@@ -104,6 +145,42 @@ test('generate click shows progress and actionable failure, then allows retry',a
   field('aiPrompt').value='修改需求';
   await field('aiGenerate').onclick();
   assert.match(field('aiStatusTip').textContent,/解析失敗/);
+});
+
+test('AI accepts structured dates, location and category without a prose prompt on desktop and mobile',async()=>{
+  const html=fs.readFileSync(new URL('./index.html',import.meta.url),'utf8');
+  for(const mobile of [false,true]) {
+    const nodes=new Map();
+    const node=key=>{if(!nodes.has(key))nodes.set(key,{style:{},value:'',textContent:'',setAttribute(){},focus(){},scrollIntoView(){}});return nodes.get(key)};
+    let payload;
+    const ctx=vm.createContext({today:new Date(2026,9,9),localStorage:{getItem:()=>JSON.stringify({provider:'gemini'})},AI_PROVIDERS:[{value:'browser',label:'瀏覽器內建 AI',models:[]},{value:'gemini',label:'Gemini',models:[{id:'test'}]}],getDefaultAIProvider:()=> 'gemini',BrowserAI:{isSupported:()=>false},root:{insertAdjacentHTML(){}},iso:date=>`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`,esc:String,COLORS:{工作:'#fff',旅遊:'#fff'},calendars:[],calendarFilter:'',document:{querySelector:node,getElementById:node},$:node,window:{matchMedia:()=>({matches:mobile})},location:{protocol:'http:'},AIRequest:{parse:()=>({})},AbortSignal,fetch:async(url,options)=>{payload=JSON.parse(options.body);return {ok:false,status:503,headers:{get:()=> 'application/json'}}}});
+    vm.runInContext(html.slice(html.indexOf('function openAIPlan()'),html.indexOf('function genMockPlanClient')),ctx);
+    ctx.openAIPlan();
+    const field=id=>node('#aiPlanWrap #'+id);
+    field('aiStart').value='2026-10-24';field('aiEnd').value='2026-10-26';
+    field('aiLocation').value='台南';field('aiCategory').value='旅遊';
+    await field('aiGenerate').onclick();
+    assert.match(payload.prompt,/2026-10-24 至 2026-10-26/);
+    assert.match(payload.prompt,/台南/);
+    assert.match(payload.prompt,/旅遊/);
+    assert.equal(payload.provider,'gemini');
+    assert.equal(payload.location,'台南');assert.equal(payload.category,'旅遊');
+  }
+});
+
+test('Android AI plan requests use the configured self-hosted endpoint and owner token',async()=>{
+  const html=fs.readFileSync(new URL('./index.html',import.meta.url),'utf8');
+  const nodes=new Map(),node=key=>{if(!nodes.has(key))nodes.set(key,{style:{},value:'',textContent:'',checked:false,setAttribute(){},focus(){},scrollIntoView(){}});return nodes.get(key)};
+  let request;
+  const ctx=vm.createContext({today:new Date(2026,9,9),localStorage:{getItem:()=>JSON.stringify({provider:'gemini'})},AI_PROVIDERS:[{value:'browser',label:'瀏覽器內建 AI',models:[]},{value:'gemini',label:'Gemini',models:[{id:'gemini-test'}]}],getDefaultAIProvider:()=> 'gemini',calendarAIEndpoint:()=> 'https://calendar.example.com/api/ai/plan',calendarAIHeaders:()=>({'Content-Type':'application/json',Authorization:'Bearer owner-test-token'}),root:{insertAdjacentHTML(){}},iso:()=> '2026-10-10',esc:String,COLORS:{旅遊:'#fff'},calendars:[],calendarFilter:'',document:{querySelector:node,getElementById:node},$:node,window:{LifeTempoWidget:{}},location:{protocol:'https:'},AIRequest:{parse:()=>({})},AbortSignal,fetch:async(url,options)=>{request={url,options};return {ok:false,status:503,headers:{get:()=> 'application/json'},json:async()=>({error:'test response'})}}});
+  vm.runInContext(html.slice(html.indexOf('function openAIPlan()'),html.indexOf('function genMockPlanClient')),ctx);
+  ctx.openAIPlan();
+  const field=id=>node('#aiPlanWrap #'+id);
+  field('aiPrompt').value='安排台南行程';field('aiStart').value='2026-10-10';field('aiEnd').value='2026-10-10';field('aiCategory').value='旅遊';
+  await field('aiGenerate').onclick();
+  assert.equal(request.url,'https://calendar.example.com/api/ai/plan');
+  assert.equal(request.options.headers.Authorization,'Bearer owner-test-token');
+  assert.equal(JSON.parse(request.options.body).provider,'gemini');
 });
 
 async function planWith(events, prompt='安排活動', options={}) {
@@ -183,7 +260,7 @@ test('confirm inserts separate morning and afternoon slots and preserves end dat
   const html=fs.readFileSync(new URL('./index.html',import.meta.url),'utf8');
   const nodes=new Map();
   const node=key=>{if(!nodes.has(key))nodes.set(key,{style:{},value:'',textContent:'',remove(){}});return nodes.get(key)};
-  const ctx=vm.createContext({today:new Date(2026,9,11),localStorage:{getItem:()=>null},AI_PROVIDERS:[{value:'gemini',label:'Gemini',models:[]}],root:{insertAdjacentHTML(){}},iso:()=> '2026-10-24',esc:String,COLORS:{工作:'#fff'},calendars:[],calendarFilter:'',document:{querySelector:node,getElementById:node},$:node,window:{},location:{protocol:'file:'},permissionFor:()=> 'full-access',confirm:()=>true,crypto:{randomUUID:()=>String(Math.random())},events:[],selectedTz:'Asia/Taipei',save(){},render(){},toast(){},parse:s=>new Date(s)});
+  const ctx=vm.createContext({today:new Date(2026,9,11),localStorage:{getItem:()=>null},AI_PROVIDERS:[{value:'gemini',label:'Gemini',models:[]}],getDefaultAIProvider:()=> 'gemini',root:{insertAdjacentHTML(){}},iso:()=> '2026-10-24',esc:String,COLORS:{工作:'#fff'},calendars:[],calendarFilter:'',document:{querySelector:node,getElementById:node},$:node,window:{},location:{protocol:'file:'},permissionFor:()=> 'full-access',confirm:()=>true,crypto:{randomUUID:()=>String(Math.random())},events:[],selectedTz:'Asia/Taipei',save(){},render(){},toast(){},parse:s=>new Date(s)});
   vm.runInContext(html.slice(html.indexOf('function openAIPlan()'),html.indexOf('function genMockPlanClient')),ctx);
   ctx.openAIPlan();
   vm.runInContext(`aiPlanState.events=[{title:'上午活動',date:'2026-10-24',endDate:'2026-10-24',start:'09:15',end:'11:45',timezone:'Asia/Tokyo'},{title:'下午活動',date:'2026-10-24',endDate:'2026-10-24',start:'14:00',end:'17:30',timezone:'Asia/Tokyo'}]`,ctx);

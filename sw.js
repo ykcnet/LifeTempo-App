@@ -1,4 +1,4 @@
-const CACHE = 'lifetempo-shell-v8';
+const CACHE = 'lifetempo-shell-v9';
 const BASE_URL = new URL('./', self.location.href);
 const SHELL = ['./', 'index.html', 'calendar-core.js', 'vendor/ical.js', 'calendar-ics.js', 'ai-request.js', 'booking-client.js', 'enhancements.js', 'localization-data.js', 'localization-core.js', 'localization-client.js', 'localization.css', 'manifest.webmanifest', 'LifeTempo-Icons/source/LifeTempo-rounded.svg', 'LifeTempo-Icons/android/play-store-512.png'].map(path => new URL(path, BASE_URL).href);
 const SHELL_PATHS = new Set(SHELL.map(path => new URL(path).pathname));

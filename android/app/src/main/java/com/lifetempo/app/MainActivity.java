@@ -5,18 +5,23 @@ import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.widget.Toast;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebView;
 import androidx.webkit.WebViewAssetLoader;
 import androidx.webkit.WebViewClientCompat;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 
 public final class MainActivity extends Activity {
     private static final String APP_ORIGIN = "https://appassets.androidplatform.net/";
     private static final int FILE_CHOOSER_REQUEST = 4201;
+    private static final int EXPORT_FILE_REQUEST = 4202;
     private WebView webView;
     private ValueCallback<Uri[]> fileChooserCallback;
+    private String pendingExportContent;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -25,6 +30,7 @@ public final class MainActivity extends Activity {
         webView.getSettings().setJavaScriptEnabled(true);
         webView.getSettings().setDomStorageEnabled(true);
         webView.addJavascriptInterface(new LifeTempoWidgetBridge(this), "LifeTempoWidget");
+        webView.addJavascriptInterface(new ExportBridge(), "LifeTempoFiles");
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
@@ -72,6 +78,20 @@ public final class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == EXPORT_FILE_REQUEST) {
+            String content = pendingExportContent;
+            pendingExportContent = null;
+            Uri destination = data == null ? null : data.getData();
+            if (resultCode != RESULT_OK || destination == null || content == null) return;
+            try (OutputStream output = getContentResolver().openOutputStream(destination)) {
+                if (output == null) throw new IllegalStateException("Unable to open destination");
+                output.write(content.getBytes(StandardCharsets.UTF_8));
+                Toast.makeText(this, "檔案已儲存", Toast.LENGTH_SHORT).show();
+            } catch (Exception error) {
+                Toast.makeText(this, "無法儲存檔案，請重新匯出", Toast.LENGTH_LONG).show();
+            }
+            return;
+        }
         if (requestCode != FILE_CHOOSER_REQUEST || fileChooserCallback == null) return;
         Uri[] results = WebChromeClient.FileChooserParams.parseResult(resultCode, data);
         fileChooserCallback.onReceiveValue(results);
@@ -81,6 +101,28 @@ public final class MainActivity extends Activity {
     private void loadApp(Intent intent) {
         String widget = intent == null ? null : intent.getStringExtra("widget");
         webView.loadUrl(APP_ORIGIN + "index.html" + (widget == null ? "" : "?widget=" + Uri.encode(widget)));
+    }
+
+    private final class ExportBridge {
+        @android.webkit.JavascriptInterface
+        public void saveText(String filename, String mimeType, String content) {
+            if (content == null || content.length() > 5_000_000
+                    || !("application/json".equals(mimeType) || "text/calendar".equals(mimeType))) return;
+            runOnUiThread(() -> {
+                pendingExportContent = content;
+                Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+                intent.addCategory(Intent.CATEGORY_OPENABLE);
+                intent.setType(mimeType);
+                String safeName = filename == null ? "lifetempo-export" : filename.replaceAll("[\\\\/:*?\"<>|]", "_");
+                intent.putExtra(Intent.EXTRA_TITLE, safeName);
+                try {
+                    startActivityForResult(intent, EXPORT_FILE_REQUEST);
+                } catch (Exception error) {
+                    pendingExportContent = null;
+                    Toast.makeText(MainActivity.this, "無法開啟檔案儲存位置", Toast.LENGTH_LONG).show();
+                }
+            });
+        }
     }
 
     @Override

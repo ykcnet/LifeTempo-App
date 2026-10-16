@@ -22,6 +22,7 @@ function setup(LanguageModel, extras={}) {
 }
 test('unsupported browsers and unavailable models report actionable errors',async()=>{
   await assert.rejects(setup().BrowserAI.generate({}),/尚未提供內建 AI/);
+  await assert.rejects(setup(undefined,{LifeTempoWidget:{}}).BrowserAI.generate({}),/Android App 的 WebView 不支援.*一鍵連線 AI/);
   await assert.rejects(setup({availability:async()=> 'unavailable',create(){throw Error('must not create')}}).BrowserAI.generate({}),/暫不可用/);
 });
 
@@ -147,20 +148,26 @@ test('user cancellation aborts the live prompt and releases the session',async()
   await assert.rejects(ctx.BrowserAI.generate({prompt:'規劃'},()=>{},controller.signal),/已取消規劃/);
   assert.equal(destroyed,1);assert.equal(ctx.BrowserAI.lastFailure,null);
 });
-test('browser generation has one shared 120-second timeout and reports timeout separately from cancellation',async()=>{
-  let timeoutMs=0,cleared=0,destroyed=0,calls=0;
+test('browser generation has no fixed timeout and can finish after a long-running model request',async()=>{
+  let timeoutCalls=0,destroyed=0,finish,receivedSignal;
   const ctx=setup({availability:async()=> 'available',create:async()=>({prompt:async(instruction,options)=>{
-    calls++;
-    assert.equal(options.signal.aborted,true);
-    throw Object.assign(Error('generation aborted'),{name:'AbortError'});
-  },destroy(){destroyed++}})}, {
-    setTimeout(callback,ms){timeoutMs=ms;callback();return 17;},
-    clearTimeout(id){assert.equal(id,17);cleared++;}
-  });
-  await assert.rejects(ctx.BrowserAI.generate({prompt:'三天行程',startDate:'2026-10-24',endDate:'2026-10-26'}),/規劃逾時（120 秒）/);
-  assert.equal(timeoutMs,120000);assert.equal(cleared,1);assert.equal(destroyed,1);assert.equal(calls,1);
-  assert.equal(ctx.BrowserAI.lastFailure.targetDate,'2026-10-24');
-  assert.equal(ctx.BrowserAI.lastFailure.reason,'generation aborted');
+    receivedSignal=options.signal;
+    return await new Promise(resolve=>{finish=resolve});
+  },destroy(){destroyed++}})}, {setTimeout(){timeoutCalls++;return 17;},clearTimeout(){}});
+  const controller=new AbortController();
+  const pending=ctx.BrowserAI.generate({prompt:'三天行程',startDate:'2026-10-24',endDate:'2026-10-24'},()=>{},controller.signal);
+  for(let attempt=0;attempt<10&&!finish;attempt++)await Promise.resolve();
+  assert.equal(typeof finish,'function');
+  assert.equal(receivedSignal,controller.signal);
+  assert.equal(timeoutCalls,0);
+  finish(JSON.stringify({events:[{title:'較慢完成的行程',date:'2026-10-24',start:'09:00',end:'10:00'}]}));
+  const result=await pending;
+  assert.equal(result.events[0].title,'較慢完成的行程');
+  assert.equal(destroyed,1);
+});
+
+test('browser AI bundle does not restore a fixed 120-second generation timeout',()=>{
+  assert.doesNotMatch(fs.readFileSync(new URL('./ai-request.js',import.meta.url),'utf8'),/120000|規劃逾時（120 秒）/);
 });
 test('browser generation downloads on demand, validates times and releases the session',async()=>{
   let destroyed=0, content, instruction;
@@ -199,7 +206,7 @@ test('default planner invokes browser AI without fetching an API endpoint',async
   const nodes=new Map();
   const node=id=>{if(!nodes.has(id))nodes.set(id,{value:'',style:{},setAttribute(){},focus(){},scrollIntoView(){},querySelectorAll:()=>[]});return nodes.get(id)};
   let called=false;
-  const ctx=vm.createContext({today:new Date(2026,9,11),localStorage:{getItem:()=>null},AI_PROVIDERS:[{value:'browser',label:'瀏覽器內建 AI',models:[]}],root:{insertAdjacentHTML(){}},iso:()=> '2026-10-24',esc:String,COLORS:{工作:'#fff'},calendars:[],calendarFilter:'',document:{querySelector:node,getElementById:node},$:node,window:{},location:{protocol:'file:'},AIRequest:{parse:()=>({})},fetch(){throw Error('must not call API')},BrowserAI:{generate:async payload=>{called=true;assert.equal(payload.provider,'browser');return {mode:'llm',events:[{title:'會議',date:'2026-10-24',start:'14:15',end:'15:45'}]}}},parse:s=>new Date(s),dayNames:['日','一','二','三','四','五','六'],lunarLabel:()=>'',formatTime:s=>s});
+  const ctx=vm.createContext({today:new Date(2026,9,11),localStorage:{getItem:()=>null},AI_PROVIDERS:[{value:'browser',label:'瀏覽器內建 AI',models:[]}],getDefaultAIProvider:()=> 'browser',root:{insertAdjacentHTML(){}},iso:()=> '2026-10-24',esc:String,COLORS:{工作:'#fff'},calendars:[],calendarFilter:'',document:{querySelector:node,getElementById:node},$:node,window:{},location:{protocol:'file:'},AIRequest:{parse:()=>({})},fetch(){throw Error('must not call API')},BrowserAI:{generate:async payload=>{called=true;assert.equal(payload.provider,'browser');return {mode:'llm',events:[{title:'會議',date:'2026-10-24',start:'14:15',end:'15:45'}]}}},parse:s=>new Date(s),dayNames:['日','一','二','三','四','五','六'],lunarLabel:()=>'',formatTime:s=>s});
   vm.runInContext(fs.readFileSync('ai-planner.js','utf8'),ctx);
   vm.runInContext(html.slice(html.indexOf('let aiPlanState ='),html.indexOf('function genMockPlanClient')),ctx);
   ctx.openAIPlan();

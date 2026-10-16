@@ -15,7 +15,10 @@
     BrowserAI.lastFailure=null;
     const started=Date.now();
     const api=globalThis.LanguageModel;
-    if(!api?.availability || !api?.create) throw new Error('此瀏覽器尚未提供內建 AI。請使用支援內建 AI 的瀏覽器，或在「行事曆設定」選擇其他 AI 服務。');
+    if(!api?.availability || !api?.create) {
+      if(globalThis.LifeTempoWidget) throw new Error('Android App 的 WebView 不支援瀏覽器內建 AI。請到「行事曆設定 → 手機與電腦同步」連線 HTTPS 伺服器，再按「一鍵連線 AI」使用自架 AI。');
+      throw new Error('此瀏覽器尚未提供內建 AI。請使用支援內建 AI 的瀏覽器，或在「行事曆設定」選擇其他 AI 服務。');
+    }
     const languageOptions=language=>({expectedInputs:[{type:'text',languages:[language]}],expectedOutputs:[{type:'text',languages:[language]}]});
     const monitor=label=>m=>m.addEventListener('downloadprogress',e=>report(label+'：'+Math.round(e.loaded*100)+'%'));
     const zhOptions=languageOptions('zh');
@@ -74,9 +77,6 @@
         const parsed={events:[]};
         let content='',targetDate=null;
         const generationStarted=Date.now();
-        const timeoutController=new AbortController();
-        const timeoutId=setTimeout(()=>timeoutController.abort(),120000);
-        const generationSignal=signal?AbortSignal.any([signal,timeoutController.signal]):timeoutController.signal;
         try {
           for(const [index,date] of days.entries()) {
             targetDate=date;content='';
@@ -85,13 +85,13 @@
               session=null;
               previousSession?.destroy();
               report(`正在準備第 ${index+1}/${days.length} 天的獨立 AI 工作階段…`);
-              session=await api.create({...options,signal:generationSignal,monitor:monitor('正在準備瀏覽器 AI 模型')});
+              session=await api.create({...options,signal,monitor:monitor('正在準備瀏覽器 AI 模型')});
             }
             const progress=()=>report(`正在規劃第 ${index+1}/${days.length} 天${date?'（'+date+'）':''}，生成已用 ${Math.round((Date.now()-generationStarted)/1000)} 秒，已收到 ${content.length} 字元…`);
             progress();
             const instruction=rules+'\n'+JSON.stringify({...requestData,targetDate:date,day:index+1,totalDays:days.length,busy:(body.existingEvents||[]).filter(e=>!date||e.date===date)});
             const daySchema=date?{...schema,properties:{...schema.properties,events:{...schema.properties.events,items:{...schema.properties.events.items,properties:{...schema.properties.events.items.properties,date:{type:'string',enum:[date]}}}}}}:schema;
-            const promptOptions={responseConstraint:daySchema,signal:generationSignal||undefined};
+            const promptOptions={responseConstraint:daySchema,signal:signal||undefined};
             let dayPlan=null;
             for(let attempt=1;attempt<=3;attempt++) {
               content='';
@@ -122,7 +122,7 @@
                 if(!dayPlan.events?.length||dayPlan.events.some(e=>!e||date&&e.date!==date)) throw new Error('AI 未完整回傳指定日期的行程');
                 break;
               } catch(attemptError) {
-                if(signal?.aborted||timeoutController.signal.aborted||attempt===3||attemptError.name==='EmptyResponseError') throw attemptError;
+                if(signal?.aborted||attempt===3||attemptError.name==='EmptyResponseError') throw attemptError;
                 report(`第 ${index+1} 天回應不完整，正在重試（${attempt+1}/3）…`);
               }
             }
@@ -133,9 +133,8 @@
         } catch(error) {
           if(signal?.aborted) throw new Error('已取消規劃，未加入任何行程。');
           BrowserAI.lastFailure={stage:'回應格式或生成',targetDate,completedEvents:parsed.events.length,generationMs:Date.now()-generationStarted,elapsedMs:Date.now()-started,receivedCharacters:content.length,reason:error.message,response:String(content||'').slice(0,16000)};
-          if(timeoutController.signal.aborted) throw new Error('AI 規劃逾時（120 秒），未加入任何行程。請縮短日期範圍或稍後重試。');
           throw new Error('瀏覽器 AI 未完成行程，請查看「AI 回應診斷」；尚未加入行事曆。');
-        } finally { clearTimeout(timeoutId); }
+        }
         if(translate) {
           report('正在將行程翻回繁體中文…');
           const translated=new Map();

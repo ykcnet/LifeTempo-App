@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 const html=fs.readFileSync('index.html','utf8');
+const enhancements=fs.readFileSync('enhancements.js','utf8');
 const source=html.slice(html.indexOf('function scheduleTask('),html.indexOf('\n}',html.indexOf('function scheduleTask('))+2);
 function run(title,existing,fail=false){
  const c={tasks:[{id:'task',title,due:'2026-10-12',done:false}],events:existing?[existing]:[],crypto:{randomUUID:()=> 'new-event'},save(){if(fail)throw Error('full');c.saved=true},saveTasks(){},toast(){},selectedTz:'Asia/Taipei',query:'old',category:'工作',attendeeFilter:'someone',calendarFilter:'other',parseNaturalLanguage:()=>({title:'開會',date:'2026-10-11',start:'15:00',end:'16:00'}),parse:s=>s,render(){},openModal(){throw Error('must not open editor')}};vm.createContext(c);vm.runInContext(source+';scheduleTask("task");',c);return c;
@@ -11,6 +12,12 @@ test('task parsing saves directly and opens its calendar date without an editor'
 test('task selected date is used when text has no date',()=>{assert.equal(run('開會').events[0].date,'2026-10-12');});
 test('already scheduled task goes to linked event without duplicating it',()=>{const event={id:'event',sourceTaskId:'task',date:'2026-10-15',calendarId:'personal'};const c=run('開會',event);assert.equal(c.events.length,1);assert.equal(c.cursor,'2026-10-15');});
 test('failed save preserves the task and does not leave a phantom event',()=>{const c=run('開會',null,true);assert.equal(c.events.length,0);assert.equal(c.tasks.length,1);assert.equal(c.tasks[0].eventId,undefined);});
+test('deleting a scheduled event keeps its task and clears the stale event link',()=>{
+ const start=enhancements.indexOf('function unlinkDeletedTaskEvent('),end=enhancements.indexOf('\n}',start)+2;
+ const context={tasks:[{id:'task',title:'整理行程',eventId:'event'}],saveTasks(){context.saved=true}};
+ vm.createContext(context);vm.runInContext(enhancements.slice(start,end)+';unlinkDeletedTaskEvent("event","task");',context);
+ assert.equal(context.tasks.length,1);assert.equal(context.tasks[0].title,'整理行程');assert.equal(context.tasks[0].eventId,undefined);assert.equal(context.saved,true);
+});
 const editStart=html.indexOf('function updateTaskTitle(');
 const editEnd=html.indexOf('\nfunction scheduleTask(',editStart);
 const editSource=html.slice(editStart,editEnd);

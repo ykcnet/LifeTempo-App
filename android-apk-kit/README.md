@@ -18,10 +18,9 @@ Android SDK 管理器首次安裝時會顯示 Google SDK 授權，請在終端�
 
 ```powershell
 .\android-apk-kit\Build-Apk.ps1
-.\android-apk-kit\Build-Apk.ps1 -Variant release
 ```
 
-APK 會輸出到 `android-apk-kit\output`。Release 使用新版 LifeTempo keystore；密碼以 Windows DPAPI 加密，僅目前 Windows 使用者可解密。舊版 keystore 只封存，不會拿來簽新版本。請另外離線備份 `private\keys`；DPAPI 密碼檔不能直接搬到另一台電腦，遷移時需重新匯入原始簽署資料。
+LifeTempo 預設建置 release（`LifeTempo-release.apk`）；debug 簽章不同，安裝時會與已安裝的 release 版衝突，請勿使用 `-Variant debug`。APK 會輸出到 `android-apk-kit\output`。Release 使用新版 LifeTempo keystore；密碼以 Windows DPAPI 加密，僅目前 Windows 使用者可解密。舊版 keystore 只封存，不會拿來簽新版本。請另外離線備份 `private\keys`；DPAPI 密碼檔不能直接搬到另一台電腦，遷移時需重新匯入原始簽署資料。
 
 工具包中的 `toolchain`、`cache`、`private`、`output` 已加入 `.gitignore`。不要移除忽略設定或把 keystore、密碼、APK 上傳到公開版本庫。Android SDK、JDK、Gradle 及其授權仍依各自官方條款使用。
 

@@ -5,14 +5,46 @@
     android:background="@drawable/widget_background"
     android:orientation="vertical"
     android:padding="10dp">
-    <TextView
-        android:id="@+id/widget_title"
+    <LinearLayout
+        android:id="@+id/calendar_month_bar"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="38dp"
+        android:background="@drawable/widget_calendar_header"
         android:gravity="center_vertical"
-        android:textColor="#202532"
-        android:textSize="15sp"
-        android:textStyle="bold" />
+        android:orientation="horizontal">
+        <TextView
+            android:id="@+id/calendar_month_prev"
+            android:layout_width="40dp"
+            android:layout_height="match_parent"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:contentDescription="上一個月"
+            android:focusable="true"
+            android:gravity="center"
+            android:text="‹"
+            android:textColor="#FFFFFF"
+            android:textSize="24sp" />
+        <TextView
+            android:id="@+id/widget_title"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center_vertical"
+            android:singleLine="true"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+        <TextView
+            android:id="@+id/calendar_month_next"
+            android:layout_width="40dp"
+            android:layout_height="match_parent"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:contentDescription="下一個月"
+            android:focusable="true"
+            android:gravity="center"
+            android:text="›"
+            android:textColor="#FFFFFF"
+            android:textSize="24sp" />
+    </LinearLayout>
     <LinearLayout
         android:id="@+id/calendar_weekdays"
         android:layout_width="match_parent"

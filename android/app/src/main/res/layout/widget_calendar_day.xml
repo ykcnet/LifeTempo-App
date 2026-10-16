@@ -1,11 +1,24 @@
-<TextView xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/calendar_day"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/calendar_day_cell"
     android:layout_width="0dp"
     android:layout_height="match_parent"
     android:layout_weight="1"
-    android:gravity="center"
-    android:includeFontPadding="false"
-    android:lineSpacingExtra="-2dp"
-    android:maxLines="2"
-    android:textColor="#303744"
-    android:textSize="11sp" />
+    android:layout_margin="0dp"
+    android:background="@drawable/widget_calendar_cell"
+    android:orientation="vertical"
+    android:padding="2dp">
+    <TextView
+        android:id="@+id/calendar_day"
+        android:layout_width="28dp"
+        android:layout_height="24dp"
+        android:layout_gravity="center_horizontal"
+        android:gravity="center"
+        android:includeFontPadding="false"
+        android:textColor="#303744"
+        android:textSize="11sp" />
+    <LinearLayout
+        android:id="@+id/calendar_day_events"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical" />
+</LinearLayout>

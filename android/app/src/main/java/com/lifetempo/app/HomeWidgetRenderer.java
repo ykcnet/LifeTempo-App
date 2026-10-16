@@ -5,6 +5,8 @@ import android.appwidget.AppWidgetManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Color;
+import android.net.Uri;
 import android.os.Bundle;
 import android.widget.RemoteViews;
 import org.json.JSONArray;
@@ -12,11 +14,11 @@ import org.json.JSONObject;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 final class HomeWidgetRenderer {
+    private static final String CALENDAR_MONTH_KEY = "calendarMonth.";
+
     private HomeWidgetRenderer() {}
 
     static void refreshAll(Context context) {
@@ -31,33 +33,43 @@ final class HomeWidgetRenderer {
 
     static void updateCalendar(Context context, AppWidgetManager manager, int[] ids) {
         if (ids == null || ids.length == 0) return;
-        Set<String> eventDates = new HashSet<>();
+        java.util.Map<String, List<JSONObject>> eventsByDate = new java.util.HashMap<>();
         try {
             JSONArray rows = new JSONArray(WidgetDataStore.events(context));
             for (int i = 0; i < rows.length(); i++) {
                 JSONObject item = rows.optJSONObject(i);
                 String date = item == null ? "" : item.optString("date", "");
-                if (date.matches("\\d{4}-\\d{2}-\\d{2}")) eventDates.add(date);
+                if (date.matches("\\d{4}-\\d{2}-\\d{2}")) {
+                    if (!item.optString("title", "").trim().isEmpty()) {
+                        eventsByDate.computeIfAbsent(date, ignored -> new ArrayList<>()).add(item);
+                    }
+                }
             }
         } catch (Exception ignored) {}
 
         LocalDate today = LocalDate.now();
-        LocalDate first = today.withDayOfMonth(1);
         int weekStart = context.getSharedPreferences("lifetempo_widgets", Context.MODE_PRIVATE)
                 .getInt("weekStart", 0);
-        int firstDay = first.getDayOfWeek().getValue() % 7;
-        LocalDate gridStart = first.minusDays((firstDay - weekStart + 7) % 7);
 
         for (int id : ids) {
+            LocalDate displayedMonth = displayedCalendarMonth(context, id, today);
+            LocalDate first = displayedMonth.withDayOfMonth(1);
+            int firstDay = first.getDayOfWeek().getValue() % 7;
+            LocalDate gridStart = first.minusDays((firstDay - weekStart + 7) % 7);
             Bundle options = manager.getAppWidgetOptions(id);
             int minWidth = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 250);
             int minHeight = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 200);
             float dayTextSize = minWidth < 230 ? 9f : 12f;
             float weekdayTextSize = minWidth < 230 ? 8f : 10f;
             if (minHeight < 150) dayTextSize = 8f;
+            int eventLimit = minHeight < 270 ? 1 : minHeight < 420 ? 2 : 3;
 
             RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_calendar);
-            views.setTextViewText(R.id.widget_title, today.getYear() + " 年 " + today.getMonthValue() + " 月");
+                views.setTextViewText(R.id.widget_title, displayedMonth.getYear() + " 年 " + displayedMonth.getMonthValue() + " 月");
+                views.setOnClickPendingIntent(R.id.calendar_month_prev,
+                    calendarMonthIntent(context, id, CalendarWidgetProvider.ACTION_PREVIOUS_MONTH, false));
+                views.setOnClickPendingIntent(R.id.calendar_month_next,
+                    calendarMonthIntent(context, id, CalendarWidgetProvider.ACTION_NEXT_MONTH, true));
 
             String[] weekdays = weekStart == 1
                     ? new String[]{"一", "二", "三", "四", "五", "六", "日"}
@@ -76,13 +88,30 @@ final class HomeWidgetRenderer {
                 for (int day = 0; day < 7; day++) {
                     LocalDate date = gridStart.plusDays(week * 7L + day);
                     RemoteViews cell = new RemoteViews(context.getPackageName(), R.layout.widget_calendar_day);
-                    String marker = eventDates.contains(date.toString()) ? "\n•" : "";
-                    cell.setTextViewText(R.id.calendar_day, date.getDayOfMonth() + marker);
+                    List<JSONObject> dayEvents = eventsByDate.getOrDefault(date.toString(), new ArrayList<>());
+                    cell.setTextViewText(R.id.calendar_day, String.valueOf(date.getDayOfMonth()));
                     cell.setTextViewTextSize(R.id.calendar_day, 2, dayTextSize);
-                    int textColor = date.getMonthValue() == today.getMonthValue() ? 0xFF303744 : 0xFF9AA1AE;
+                    int textColor = date.getYear() == today.getYear() && date.getMonth() == today.getMonth() ? 0xFF303744 : 0xFF9AA1AE;
+                    if (date.equals(today)) textColor = Color.WHITE;
                     cell.setTextColor(R.id.calendar_day, textColor);
-                    cell.setInt(R.id.calendar_day, "setBackgroundResource",
-                            date.equals(today) ? R.drawable.widget_calendar_today : R.drawable.widget_calendar_cell);
+                    cell.setInt(R.id.calendar_day_cell, "setBackgroundResource", R.drawable.widget_calendar_cell);
+                    cell.setInt(R.id.calendar_day, "setBackgroundResource", date.equals(today) ? R.drawable.widget_calendar_today : 0);
+                    int visibleEvents = Math.min(dayEvents.size(), eventLimit);
+                    if (dayEvents.size() > eventLimit && visibleEvents > 0) visibleEvents--;
+                    for (int eventIndex = 0; eventIndex < visibleEvents; eventIndex++) {
+                        JSONObject item = dayEvents.get(eventIndex);
+                        RemoteViews eventView = new RemoteViews(context.getPackageName(), R.layout.widget_calendar_event);
+                        eventView.setTextViewText(R.id.calendar_event, item.optString("title", "").trim());
+                        eventView.setInt(R.id.calendar_event, "setBackgroundColor", eventTint(item.optString("color", "")));
+                        cell.addView(R.id.calendar_day_events, eventView);
+                    }
+                    if (dayEvents.size() > eventLimit) {
+                        RemoteViews overflow = new RemoteViews(context.getPackageName(), R.layout.widget_calendar_event);
+                        overflow.setTextViewText(R.id.calendar_event, "+" + (dayEvents.size() - visibleEvents) + " 項");
+                        overflow.setTextColor(R.id.calendar_event, 0xFF586174);
+                        overflow.setInt(R.id.calendar_event, "setBackgroundColor", 0xFFE8EBF0);
+                        cell.addView(R.id.calendar_day_events, overflow);
+                    }
                     row.addView(R.id.calendar_week_row, cell);
                 }
                 views.addView(R.id.calendar_days, row);
@@ -96,6 +125,39 @@ final class HomeWidgetRenderer {
             views.setOnClickPendingIntent(R.id.widget_root, pending);
             manager.updateAppWidget(id, views);
         }
+    }
+
+    static void shiftCalendarMonth(Context context, int id, int amount) {
+        LocalDate today = LocalDate.now();
+        LocalDate nextMonth = displayedCalendarMonth(context, id, today).plusMonths(amount);
+        context.getSharedPreferences("lifetempo_widgets", Context.MODE_PRIVATE).edit()
+                .putString(CALENDAR_MONTH_KEY + id, nextMonth.withDayOfMonth(1).toString()).apply();
+        updateCalendar(context, AppWidgetManager.getInstance(context), new int[]{id});
+    }
+
+    private static LocalDate displayedCalendarMonth(Context context, int id, LocalDate today) {
+        String month = context.getSharedPreferences("lifetempo_widgets", Context.MODE_PRIVATE)
+                .getString(CALENDAR_MONTH_KEY + id, "");
+        try {
+            return month.isEmpty() ? today.withDayOfMonth(1) : LocalDate.parse(month).withDayOfMonth(1);
+        } catch (RuntimeException ignored) {
+            return today.withDayOfMonth(1);
+        }
+    }
+
+    private static PendingIntent calendarMonthIntent(Context context, int id, String action, boolean next) {
+        String direction = next ? "next" : "previous";
+        Intent intent = new Intent(context, CalendarWidgetProvider.class).setAction(action)
+                .setData(Uri.parse("lifetempo://calendar/" + id + "/" + direction))
+                .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id);
+        return PendingIntent.getBroadcast(context, id * 2 + (next ? 1 : 0), intent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+    }
+
+    private static int eventTint(String value) {
+        if (!value.matches("#[A-Fa-f0-9]{6}")) return 0xFFE4F1E5;
+        int color = Color.parseColor(value);
+        return Color.rgb((Color.red(color) + 765) / 4, (Color.green(color) + 765) / 4, (Color.blue(color) + 765) / 4);
     }
 
     static void update(Context context, AppWidgetManager manager, int[] ids, boolean todo) {

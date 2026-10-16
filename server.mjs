@@ -17,7 +17,7 @@ const MISTRAL_API_KEY = process.env.MISTRAL_API_KEY || process.env.LIFETEMPO_MIS
 const TOGETHER_API_KEY = process.env.TOGETHER_API_KEY || process.env.LIFETEMPO_TOGETHER_KEY || '';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
-const dataDir = path.join(root, 'data');
+const dataDir = process.env.LIFETEMPO_DATA_DIR || path.join(root, 'data');
 fs.mkdirSync(dataDir, { recursive: true });
 const db = new DatabaseSync(path.join(dataDir, 'lifetempo.sqlite'));
 db.exec(`
@@ -41,6 +41,10 @@ db.exec(`
     status TEXT NOT NULL DEFAULT 'confirmed', created_at TEXT NOT NULL
   );
   CREATE INDEX IF NOT EXISTS bookings_date ON bookings(date);
+  CREATE TABLE IF NOT EXISTS calendar_sync (
+    id INTEGER PRIMARY KEY CHECK(id = 1), revision INTEGER NOT NULL,
+    state TEXT NOT NULL, updated_at TEXT NOT NULL
+  );
 `);
 
 let config = db.prepare('SELECT * FROM booking_config WHERE id=1').get();
@@ -64,18 +68,38 @@ const server = http.createServer(async (req, res) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'no-referrer');
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  const androidAppOrigin = 'https://appassets.androidplatform.net';
+  const nativeApiMethods = {
+    '/api/owner/calendar-sync': 'GET, PUT, OPTIONS',
+    '/api/ai/status': 'GET, OPTIONS',
+    '/api/ai/plan': 'POST, OPTIONS'
+  };
+  if (nativeApiMethods[url.pathname] && req.headers.origin === androidAppOrigin) {
+    res.setHeader('Access-Control-Allow-Origin', androidAppOrigin);
+    res.setHeader('Access-Control-Allow-Methods', nativeApiMethods[url.pathname]);
+    res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+    res.setHeader('Vary', 'Origin');
+    if (req.method === 'OPTIONS') return res.writeHead(204).end();
+  }
   if (req.method === 'GET' && url.pathname === '/api/calendar/config') {
     return json(res, 200, { clientId: process.env.LIFETEMPO_GOOGLE_CLIENT_ID || '' });
   }
   try {
     if (req.method === 'GET' && url.pathname === '/api/health') return json(res, 200, { ok: true });
     if (req.method === 'GET' && url.pathname === '/api/ai/status') {
+      if (req.headers.origin === androidAppOrigin && !authorized(req)) return json(res, 401, { error: 'owner token 無效或尚未連線' });
       const hasGemini = !!GEMINI_API_KEY;
       const hasOpenAI = !!OPENAI_API_KEY;
       const hasOpenRouter = !!OPENROUTER_API_KEY;
       const hasAnthropic = !!ANTHROPIC_API_KEY;
+      const hasDeepSeek = !!DEEPSEEK_API_KEY;
+      const hasGroq = !!GROQ_API_KEY;
+      const hasCohere = !!COHERE_API_KEY;
+      const hasMistral = !!MISTRAL_API_KEY;
+      const hasTogether = !!TOGETHER_API_KEY;
       return json(res, 200, {
-        configured: !!(hasGemini || hasOpenAI || hasOpenRouter || hasAnthropic),
+        configured: !!(hasGemini || hasOpenAI || hasOpenRouter || hasAnthropic || hasDeepSeek || hasGroq || hasCohere || hasMistral || hasTogether),
+        providerKeys: {gemini:hasGemini,openai:hasOpenAI,openrouter:hasOpenRouter,anthropic:hasAnthropic,deepseek:hasDeepSeek,groq:hasGroq,cohere:hasCohere,mistral:hasMistral,together:hasTogether},
         providers: {
           openai: { configured: hasOpenAI, models: [ {id:'gpt-4o-mini', name:'GPT-4o mini', free:false, desc:'輕量快速，結構化輸出穩定'} ] },
           openrouter: { configured: hasOpenRouter, models: [ {id:'openai/gpt-4o-mini', name:'GPT-4o mini (OpenRouter)', free:false, desc:'透過 OpenRouter 介接'}, {id:'google/gemini-flash-1.5b', name:'Gemini Flash 1.5B (OpenRouter)', free:true, desc:'免費額度高，適合預算規劃'} ] },
@@ -85,6 +109,7 @@ const server = http.createServer(async (req, res) => {
       });
     }
     if (req.method === 'POST' && url.pathname === '/api/ai/plan') {
+      if (req.headers.origin === androidAppOrigin && !authorized(req)) return json(res, 401, { error: 'owner token 無效或尚未連線' });
       if (!allowBookingRequest(req)) return json(res, 429, { error: '請稍後再試' });
       const body = await readJson(req);
       return json(res, 200, await generatePlan(body));
@@ -134,6 +159,31 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname.startsWith('/api/owner/')) {
       if (!authorized(req)) return json(res, 401, { error: '需要有效的 LifeTempo owner token' });
       if (req.method === 'GET' && url.pathname === '/api/owner/config') return json(res, 200, publicConfig(getConfigById()));
+      if (req.method === 'GET' && url.pathname === '/api/owner/calendar-sync') {
+        const row = db.prepare('SELECT revision,state,updated_at FROM calendar_sync WHERE id=1').get();
+        return json(res, 200, row ? { revision: row.revision, state: JSON.parse(row.state), updatedAt: row.updated_at } : { revision: 0, state: null, updatedAt: null });
+      }
+      if (req.method === 'PUT' && url.pathname === '/api/owner/calendar-sync') {
+        const body = await readJson(req, 8_388_608);
+        if (!Number.isSafeInteger(body.revision) || body.revision < 0 || !validCalendarSyncState(body.state) || JSON.stringify(body.state).length > 8_000_000) {
+          return json(res, 400, { error: '同步資料格式無效或超過 8 MB' });
+        }
+        db.exec('BEGIN IMMEDIATE');
+        try {
+          const current = db.prepare('SELECT revision,state,updated_at FROM calendar_sync WHERE id=1').get();
+          const currentRevision = current?.revision || 0;
+          if (body.revision !== currentRevision) {
+            db.exec('ROLLBACK');
+            return json(res, 409, { error: '伺服器資料已更新', revision: currentRevision, state: current ? JSON.parse(current.state) : null, updatedAt: current?.updated_at || null });
+          }
+          const revision = currentRevision + 1, updatedAt = new Date().toISOString();
+          db.prepare(`INSERT INTO calendar_sync(id,revision,state,updated_at) VALUES(1,?,?,?)
+            ON CONFLICT(id) DO UPDATE SET revision=excluded.revision,state=excluded.state,updated_at=excluded.updated_at`)
+            .run(revision, JSON.stringify(body.state), updatedAt);
+          db.exec('COMMIT');
+          return json(res, 200, { revision, state: body.state, updatedAt });
+        } catch (error) { db.exec('ROLLBACK'); throw error; }
+      }
       if (req.method === 'PUT' && url.pathname === '/api/owner/config') {
         const body = await readJson(req);
         const next = validateConfig(body);
@@ -187,7 +237,7 @@ const server = http.createServer(async (req, res) => {
     return json(res, 404, { error: 'not found' });
   } catch (error) {
     console.error(error);
-    if (!res.headersSent) json(res, 500, { error: '服務暫時無法處理請求' });
+    if (!res.headersSent) json(res, error.statusCode || 500, { error: error.statusCode === 413 ? '請求資料超過大小限制' : '服務暫時無法處理請求' });
   }
 });
 
@@ -226,6 +276,18 @@ function dateInZone(date, timezone) { const parts = new Intl.DateTimeFormat('en-
 function zonedInstant(date, time, timezone) { const [year, month, day] = date.split('-').map(Number), [hour, minute] = time.split(':').map(Number), desired = Date.UTC(year, month-1, day, hour, minute); let instant = desired; for (let attempt=0; attempt<3; attempt++) { const parts = new Intl.DateTimeFormat('en-US', { timeZone: timezone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).formatToParts(new Date(instant)); const values = Object.fromEntries(parts.map(part => [part.type, Number(part.value)])); const represented = Date.UTC(values.year, values.month-1, values.day, values.hour, values.minute); const correction = desired-represented; instant += correction; if (!correction) break; } return new Date(instant); }
 function validDate(value) { if (!/^\d{4}-\d{2}-\d{2}$/.test(value || '')) return false; const parsed = new Date(`${value}T00:00:00Z`); return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0,10) === value; }
 function clock(minutes) { return `${String(Math.floor(minutes / 60)).padStart(2,'0')}:${String(minutes % 60).padStart(2,'0')}`; }
+function validCalendarSyncState(state) {
+  if (!state || typeof state !== 'object' || Array.isArray(state) || state.schemaVersion !== 1) return false;
+  if (!Array.isArray(state.events) || state.events.length > 20000 || !state.events.every(item => item && typeof item === 'object' && !Array.isArray(item))) return false;
+  if (!Array.isArray(state.tasks) || state.tasks.length > 10000 || !state.tasks.every(item => item && typeof item === 'object' && !Array.isArray(item))) return false;
+  if (!Array.isArray(state.calendars) || state.calendars.length > 1000 || !state.calendars.every(item => item && typeof item === 'object' && !Array.isArray(item))) return false;
+  if (!state.categories || typeof state.categories !== 'object' || Array.isArray(state.categories) || Object.values(state.categories).some(color => typeof color !== 'string' || !/^#[a-f\d]{6}$/i.test(color))) return false;
+  if (!Array.isArray(state.inviteChannels) || state.inviteChannels.length > 100 || state.inviteChannels.some(channel => typeof channel !== 'string' || channel.length > 80)) return false;
+  if (!state.settings || typeof state.settings !== 'object' || Array.isArray(state.settings)) return false;
+  if (typeof state.settings.timezone !== 'string' || state.settings.timezone.length > 80 || !['12','24'].includes(String(state.settings.clockFormat))) return false;
+  try { new Intl.DateTimeFormat('en', { timeZone: state.settings.timezone }); } catch { return false; }
+  return true;
+}
 function clean(value, max) { return String(value || '').replace(/[<>\u0000-\u001f]/g, '').trim().slice(0, max); }
 function authorized(req) {
   const supplied = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
@@ -240,9 +302,15 @@ function allowBookingRequest(req) {
   return item.count <= 10;
 }
 const limits = new Map();
-async function readJson(req) {
-  let text = ''; for await (const chunk of req) { text += chunk; if (text.length > 2097152) throw new Error('request too large'); }
-  return JSON.parse(text || '{}');
+async function readJson(req, maxBytes = 2097152) {
+  const chunks=[];let size=0;
+  for await (const chunk of req) {
+    const buffer=Buffer.isBuffer(chunk)?chunk:Buffer.from(chunk);
+    size+=buffer.length;
+    if(size>maxBytes){const error=new Error('request too large');error.statusCode=413;throw error;}
+    chunks.push(buffer);
+  }
+  return JSON.parse(size?Buffer.concat(chunks,size).toString('utf8'):'{}');
 }
 function json(res, status, value) { res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(value)); }
 function html(res, status, value) { res.writeHead(status, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(value); }

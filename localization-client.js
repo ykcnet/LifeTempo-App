@@ -28,7 +28,7 @@ render=function(){
     const year=cursor.getFullYear();
     const note=document.createElement('p');note.className='local-source';
     note.innerHTML=`${localPrefs.region==='TW'?'假日依臺灣政府行政機關辦公日曆（民間休假依適用規定）；':''}節氣採 UTC+8 日期。${LocalCalendarData.years.includes(year)?'':'此瀏覽年份未收錄官方假日／節氣，未以近似值代替。'} <a href="https://data.gov.tw/dataset/14718" target="_blank" rel="noopener">假日來源</a> · <a href="https://www.hko.gov.hk/tc/gts/time/conversion.htm" target="_blank" rel="noopener">農曆／節氣來源</a>`;
-    $('.main .viewbar')?.after(note);
+    $('.main .bottom-note')?.before(note);
   }
   if(view==='年'&&!query)document.querySelectorAll('[data-month]').forEach(element=>{
     const prefix=`${cursor.getFullYear()}-${pad(Number(element.dataset.month)+1)}-`;
@@ -73,12 +73,12 @@ function readWeather(city){
 }
 function paintWeather(){
   const panel=$('#weatherPanel');if(!panel)return;
-  const city=localPrefs.city,cached=readWeather(city),day=CalendarCore.parts(Date.now(),'Asia/Taipei').date,todayWeather=cached?.days.find(d=>d.date===day),stale=cached&&Date.now()-cached.fetchedAt>1800000;
+  const grid=$('.workspace-calendar .main>.card:not(.local-weather)'),gridTop=grid?.getBoundingClientRect().top,panelAbove=panel.getBoundingClientRect().bottom<=0;  const city=localPrefs.city,cached=readWeather(city),day=CalendarCore.parts(Date.now(),'Asia/Taipei').date,todayWeather=cached?.days.find(d=>d.date===day),stale=cached&&Date.now()-cached.fetchedAt>1800000;
   const value=n=>Number.isFinite(n)?Math.round(n):'—';
   const line=d=>`${LocalCalendar.weatherLabel(d.code)} · ${value(d.min)}–${value(d.max)} °C · 降雨 ${value(d.rain)}%`;
   panel.innerHTML=`<div class="local-weather-head"><strong>${esc(LocalCalendar.cities[city][0])}天氣</strong><button type="button" id="refreshLocalWeather" ${weatherInFlight===city?'disabled':''}>${weatherInFlight===city?'更新中…':'更新天氣'}</button></div><p>${todayWeather?esc(line(todayWeather)):weatherError||(!navigator.onLine?'離線，尚無今日天氣快取':'正在讀取預報…')}</p>${cached?`<small>${stale||weatherError||!navigator.onLine?'快取資料 · ':''}更新於 ${esc(new Date(cached.fetchedAt).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:false}))}（臺灣時間）${weatherError?' · '+esc(weatherError):''}</small><details><summary>未來 7 天</summary><div class="local-forecast">${cached.days.filter(d=>d.date>=day).map(d=>`<div><b>${d.date.slice(5)}</b><br>${esc(line(d))}</div>`).join('')||'快取已無可用預報，請連線更新。'}</div></details>`:''}<small class="local-source">城市中心預報，非即時測站觀測 · <a href="https://open-meteo.com/" target="_blank" rel="noopener">Weather data by Open-Meteo.com</a>（CC BY 4.0）</small>`;
   $('#refreshLocalWeather').onclick=()=>loadWeather(true);
-}
+  if(panelAbove&&grid)window.scrollBy(0,grid.getBoundingClientRect().top-gridTop);}
 async function loadWeather(force=false){
   if(!localPrefs.weather)return;
   const city=localPrefs.city,cached=readWeather(city),now=Date.now();

@@ -13,7 +13,7 @@ const server=read('./server.mjs');
 
 test('Android app declares installable home-screen widgets',()=>{
   assert.match(gradle,/applicationId = "com\.ykcnet\.lifetempo"/);
-  assert.match(gradle,/versionCode = 4/);
+  assert.match(gradle,/versionCode = 11/);
   assert.match(gradle,/LIFETEMPO_SIGNING_KEYSTORE/);
   assert.match(manifest,/android:allowBackup="false"/);
   assert.match(manifest,/TodayEventsWidgetProvider/);
@@ -42,6 +42,7 @@ test('Android shell serves only app assets and exposes a bounded widget snapshot
   assert.match(app,/LifeTempoWidgetBridge/);
   assert.match(bridge,/@JavascriptInterface/);
   assert.match(bridge,/eventsJson\.length\(\) > 1_000_000/);
+  assert.match(read('./enhancements.js'),/!window\.LifeTempoWidget && 'serviceWorker' in navigator/);
   assert.match(gradle,/include\("index\.html", "\*\.js", "\*\.css", "\*\.webmanifest"\)/);
   assert.doesNotMatch(gradle,/data\/|owner-token|(^|[\/'"])\.env(?:$|[\/'"])/);
 });
@@ -49,11 +50,49 @@ test('Android shell serves only app assets and exposes a bounded widget snapshot
 test('resizing changes visible rows and widget taps open the matching app view',()=>{
   assert.match(renderer,/OPTION_APPWIDGET_MIN_HEIGHT/);
   assert.match(renderer,/static void updateCalendar/);
+  assert.match(renderer,/eventsByDate\.computeIfAbsent/);
+  assert.match(renderer,/eventsByDate\.getOrDefault\(date\.toString\(\)/);
+  assert.match(read('./android/app/src/main/res/drawable/widget_calendar_cell.xml'),/<stroke/);
+  assert.match(read('./android/app/src/main/res/drawable/widget_calendar_cell.xml'),/android:width="0\.5dp"/);
+  assert.match(read('./android/app/src/main/res/layout/widget_calendar_day.xml'),/android:orientation="vertical"/);
+  assert.match(read('./android/app/src/main/res/layout/widget_calendar_day.xml'),/android:layout_margin="0dp"/);
+  assert.match(read('./android/app/src/main/res/layout/widget_calendar_day.xml'),/@\+id\/calendar_day_events/);
+  assert.match(read('./android/app/src/main/res/layout/widget_calendar_event.xml'),/android:maxLines="1"/);
+  assert.match(read('./android/app/src/main/res/drawable/widget_calendar_header.xml'),/61B16B/);
+  assert.match(read('./android/app/src/main/res/drawable/widget_calendar_today.xml'),/android:shape="oval"/);
+  assert.match(read('./index.html'),/color:color\(event\)/);
   assert.match(read('./android/app/src/main/java/com/lifetempo/app/CalendarWidgetProvider.java'),/onAppWidgetOptionsChanged/);
   assert.match(renderer,/putExtra\("widget", todo \? "todo" : "today"\)/);
   assert.match(read('./index.html'),/widgetLaunch==='calendar'\)view='月'/);
   assert.match(read('./index.html'),/widgetLaunch==='todo'\)view='待辦'/);
   assert.match(read('./index.html'),/bridge\.updateSnapshot\(JSON\.stringify\(upcoming\),JSON\.stringify\(tasks\.filter\(task=>!task\.done\)\.slice\(0,100\)\),LocalCalendar\.settings\.weekStart\)/);
+});
+
+test('calendar widget month controls update each widget independently',()=>{
+  const layout=read('./android/app/src/main/res/layout/widget_calendar.xml');
+  const provider=read('./android/app/src/main/java/com/lifetempo/app/CalendarWidgetProvider.java');
+  assert.match(layout,/@\+id\/calendar_month_prev/);
+  assert.match(layout,/@\+id\/calendar_month_next/);
+  assert.match(layout,/android:contentDescription="上一個月"/);
+  assert.match(layout,/android:contentDescription="下一個月"/);
+  assert.match(provider,/ACTION_PREVIOUS_MONTH/);
+  assert.match(provider,/ACTION_NEXT_MONTH/);
+  assert.match(provider,/HomeWidgetRenderer\.shiftCalendarMonth/);
+  assert.match(renderer,/setOnClickPendingIntent\(R\.id\.calendar_month_prev/);
+  assert.match(renderer,/setOnClickPendingIntent\(R\.id\.calendar_month_next/);
+  assert.match(renderer,/CALENDAR_MONTH_KEY \+ id/);
+  assert.match(renderer,/displayedCalendarMonth\(context, id, today\)\.plusMonths\(amount\)/);
+});
+
+test('Android saves JSON and iCalendar exports with the system document picker',()=>{
+  const html=read('./index.html');
+  assert.match(app,/LifeTempoFiles/);
+  assert.match(app,/ACTION_CREATE_DOCUMENT/);
+  assert.match(app,/EXPORT_FILE_REQUEST/);
+  assert.match(app,/getContentResolver\(\)\.openOutputStream/);
+  assert.match(html,/window\.LifeTempoFiles\?\.saveText/);
+  assert.match(html,/application\/json/);
+  assert.match(html,/text\/calendar/);
 });
 
 test('PWABuilder manifest has a PNG launch icon served with the correct MIME and cached offline',()=>{

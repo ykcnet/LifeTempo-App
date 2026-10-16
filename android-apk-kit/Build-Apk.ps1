@@ -1,6 +1,6 @@
 param(
     [ValidateSet('debug', 'release')]
-    [string]$Variant = 'debug',
+    [string]$Variant,
     [string]$ProjectPath
 )
 
@@ -13,6 +13,9 @@ if ([string]::IsNullOrWhiteSpace($ProjectPath)) {
 $androidRoot = (Resolve-Path $ProjectPath).Path
 $lifeTempoAndroidRoot = (Resolve-Path $defaultProjectPath).Path
 $isLifeTempoProject = [StringComparer]::OrdinalIgnoreCase.Equals($androidRoot.TrimEnd('\'), $lifeTempoAndroidRoot.TrimEnd('\'))
+if ([string]::IsNullOrWhiteSpace($Variant)) {
+    $Variant = if ($isLifeTempoProject) { 'release' } else { 'debug' }
+}
 $toolchainRoot = Join-Path $kitRoot 'toolchain'
 $jdkRoot = Join-Path $toolchainRoot 'jdk'
 $sdkRoot = Join-Path $toolchainRoot 'android-sdk'
