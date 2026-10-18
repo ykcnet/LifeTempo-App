@@ -143,7 +143,7 @@ render = function () {
   const workspaceNav = document.querySelector('.nav');
   const manageSharedButton = workspaceNav?.querySelector('[data-goview="共享"]');
   if (manageSharedButton) {
-    manageSharedButton.innerHTML = '<span class="icon">♧</span>管理共享與權限';
+    manageSharedButton.innerHTML = '<span class="icon" aria-hidden="true">♧</span><span class="nav-action-label">管理共享與權限</span>';
     const helpButton = manageSharedButton.nextElementSibling;
     if (helpButton?.classList.contains('help-btn')) {
       helpButton.dataset.helpTitle = '管理共享與權限說明';
