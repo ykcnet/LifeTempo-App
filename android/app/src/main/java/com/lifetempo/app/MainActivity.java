@@ -20,6 +20,7 @@ public final class MainActivity extends Activity {
     private static final int FILE_CHOOSER_REQUEST = 4201;
     private static final int EXPORT_FILE_REQUEST = 4202;
     private WebView webView;
+    private boolean pageReady;
     private ValueCallback<Uri[]> fileChooserCallback;
     private String pendingExportContent;
 
@@ -51,6 +52,15 @@ public final class MainActivity extends Activity {
                     .addPathHandler("/", new WebViewAssetLoader.AssetsPathHandler(this))
                 .build();
         webView.setWebViewClient(new WebViewClientCompat() {
+            @Override
+            public void onPageStarted(WebView view, String url, android.graphics.Bitmap icon) {
+                pageReady = false;
+            }
+
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                pageReady = url.startsWith(APP_ORIGIN);
+            }
             @Override
             public android.webkit.WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
                 return assetLoader.shouldInterceptRequest(request.getUrl());
@@ -100,7 +110,25 @@ public final class MainActivity extends Activity {
 
     private void loadApp(Intent intent) {
         String widget = intent == null ? null : intent.getStringExtra("widget");
-        webView.loadUrl(APP_ORIGIN + "index.html" + (widget == null ? "" : "?widget=" + Uri.encode(widget)));
+        Uri.Builder url = Uri.parse(APP_ORIGIN + "index.html").buildUpon();
+        if (widget != null) url.appendQueryParameter("widget", widget);
+        String date = intent == null ? null : intent.getStringExtra("widgetDate");
+        if (date != null && date.matches("\\d{4}-\\d{2}-\\d{2}")) url.appendQueryParameter("widgetDate", date);
+        for (String key : new String[]{"widgetEventId", "widgetRecurrence", "widgetStart"}) {
+            String value = intent == null ? null : intent.getStringExtra(key);
+            if (value != null && value.length() <= 1024) url.appendQueryParameter(key, value);
+        }
+        String destination = url.build().toString();
+        if (pageReady && widget != null) {
+            // Keep the running WebView and move directly to the destination in one render.
+            webView.evaluateJavascript("typeof window.navigateFromWidget === 'function' && window.navigateFromWidget("
+                    + org.json.JSONObject.quote(destination) + ")", result -> {
+                if (!"true".equals(result)) { pageReady = false; webView.loadUrl(destination); }
+            });
+        } else {
+            pageReady = false;
+            webView.loadUrl(destination);
+        }
     }
 
     private final class ExportBridge {

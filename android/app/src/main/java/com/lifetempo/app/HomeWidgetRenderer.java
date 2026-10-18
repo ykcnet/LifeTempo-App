@@ -138,10 +138,14 @@ final class HomeWidgetRenderer {
 
             Intent open = new Intent(context, MainActivity.class)
                     .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                    .putExtra("widget", "calendar");
+                    .setData(Uri.parse("lifetempo://calendar-open/" + id))
+                    .putExtra("widget", "calendar")
+                    .putExtra("widgetDate", displayedMonth.toString());
             PendingIntent pending = PendingIntent.getActivity(context, 3, open,
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-            views.setOnClickPendingIntent(R.id.widget_root, pending);
+            // Keep the month controls outside the app-launch click target.
+            views.setOnClickPendingIntent(R.id.widget_title, pending);
+            views.setOnClickPendingIntent(R.id.calendar_days, pending);
             manager.updateAppWidget(id, views);
         }
     }
@@ -171,12 +175,12 @@ final class HomeWidgetRenderer {
     }
 
     private static PendingIntent calendarMonthIntent(Context context, int id, String action, boolean next) {
-        String direction = CalendarWidgetProvider.ACTION_TODAY.equals(action) ? "today" : next ? "next" : "previous";
-        Intent intent = new Intent(context, CalendarWidgetProvider.class).setAction(action)
-                .setData(Uri.parse("lifetempo://calendar/" + id + "/" + direction))
+        Intent intent = new Intent(context, CalendarWidgetActionActivity.class).setAction(action)
+                .setData(Uri.parse("lifetempo://calendar-action/" + id + "/" + action))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION)
                 .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id);
         int slot = CalendarWidgetProvider.ACTION_TODAY.equals(action) ? 2 : next ? 1 : 0;
-        return PendingIntent.getBroadcast(context, id * 3 + slot, intent,
+        return PendingIntent.getActivity(context, id * 3 + slot, intent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
 
@@ -194,20 +198,99 @@ final class HomeWidgetRenderer {
             int height = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 100);
             int rowLimit = Math.max(1, Math.min(8, (height - 50) / 27));
             RemoteViews views = new RemoteViews(context.getPackageName(), todo ? R.layout.widget_todo : R.layout.widget_today);
-            views.setTextViewText(R.id.widget_title, todo ? "待辦事項" : "今日行程");
-            views.setTextViewText(R.id.widget_content, content(json, todo, rowLimit));
+            views.setTextViewText(R.id.widget_title, todo ? "待辦事項" : "近日行程");
+            if (todo) views.setTextViewText(R.id.widget_content, content(json, true, rowLimit));
 
             Intent open = new Intent(context, MainActivity.class)
                     .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP)
                     .putExtra("widget", todo ? "todo" : "today");
             PendingIntent pending = PendingIntent.getActivity(context, todo ? 2 : 1, open,
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-            views.setOnClickPendingIntent(R.id.widget_root, pending);
+            if (!todo) {
+                Intent settings = new Intent(context, WidgetSettingsActivity.class)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                        .setData(Uri.parse("lifetempo://upcoming-settings/" + id))
+                        .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id);
+                views.setOnClickPendingIntent(R.id.widget_settings, PendingIntent.getActivity(context, id, settings,
+                        PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
+                Intent template = new Intent(context, MainActivity.class)
+                        .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                        .setData(Uri.parse("lifetempo://upcoming/" + id))
+                        .putExtra("widget", "today");
+                int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+                if (android.os.Build.VERSION.SDK_INT >= 31) flags |= PendingIntent.FLAG_MUTABLE;
+                views.setPendingIntentTemplate(R.id.widget_event_rows,
+                        PendingIntent.getActivity(context, id, template, flags));
+                if (android.os.Build.VERSION.SDK_INT >= 31) {
+                    RemoteViews.RemoteCollectionItems.Builder items = new RemoteViews.RemoteCollectionItems.Builder()
+                            .setViewTypeCount(1);
+                    List<JSONObject> rows = upcomingEvents(context, id);
+                    for (int i = 0; i < rows.size(); i++) items.addItem(i, upcomingRow(context, rows.get(i), i, id));
+                    views.setRemoteAdapter(R.id.widget_event_rows, items.build());
+                } else {
+                    Intent adapter = new Intent(context, UpcomingWidgetService.class)
+                            .setData(Uri.parse("lifetempo://upcoming-adapter/" + id))
+                            .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id);
+                    views.setRemoteAdapter(R.id.widget_event_rows, adapter);
+                }
+            }
+            views.setOnClickPendingIntent(todo ? R.id.widget_root : R.id.widget_title, pending);
             manager.updateAppWidget(id, views);
+            if (!todo && android.os.Build.VERSION.SDK_INT < 31) manager.notifyAppWidgetViewDataChanged(id, R.id.widget_event_rows);
         }
     }
 
+    static List<JSONObject> upcomingEvents(Context context, int widgetId) {
+        List<JSONObject> result = new ArrayList<>();
+        try {
+            JSONArray rows = new JSONArray(WidgetDataStore.events(context));
+            for (int i = 0; i < rows.length(); i++) {
+                JSONObject event = rows.optJSONObject(i);
+                if (event == null || event.optString("title").trim().isEmpty()) continue;
+                try {
+                    if (!LocalDate.parse(event.optString("date")).isBefore(LocalDate.now())) result.add(event);
+                } catch (RuntimeException ignored) {}
+            }
+            result.sort(Comparator.comparing(e -> e.optString("date") + "T" + e.optString("start")));
+        } catch (Exception ignored) {}
+        int limit = Math.max(1, Math.min(20, context.getSharedPreferences("lifetempo_widgets", Context.MODE_PRIVATE)
+                .getInt("upcomingCount." + widgetId, 3)));
+        if (result.size() > limit) result = new ArrayList<>(result.subList(0, limit));
+        if (result.isEmpty()) {
+            JSONObject empty = new JSONObject();
+            try { empty.put("title", "近期沒有行程"); } catch (Exception ignored) {}
+            result.add(empty);
+        }
+        return result;
+    }
+
+    static RemoteViews upcomingRow(Context context, JSONObject event, int position, int widgetId) {
+        RemoteViews row = new RemoteViews(context.getPackageName(), R.layout.widget_upcoming_row);
+        String date = event.optString("date"), start = event.optString("start");
+        String time = event.optBoolean("allDay") ? "全天" : start;
+        String label = date.length() == 10 ? (date.equals(LocalDate.now().toString()) ? time : date.substring(5) + " " + time) + "\n" : "";
+        android.text.SpannableString text = new android.text.SpannableString(label + event.optString("title"));
+        if (!label.isEmpty()) text.setSpan(new android.text.style.StyleSpan(android.graphics.Typeface.BOLD),
+                0, label.length() - 1, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        row.setTextViewText(R.id.widget_event_text, text);
+        android.content.SharedPreferences prefs = context.getSharedPreferences("lifetempo_widgets", Context.MODE_PRIVATE);
+        boolean divider = prefs.getBoolean("upcomingDivider." + widgetId, true);
+        row.setTextViewTextSize(R.id.widget_event_text, android.util.TypedValue.COMPLEX_UNIT_SP,
+                12);
+        row.setViewVisibility(R.id.widget_event_divider, position == 0 || !divider ? android.view.View.GONE : android.view.View.VISIBLE);
+        Intent click = new Intent().putExtra("widgetDate", date)
+                .putExtra("widgetEventId", event.optString("id"))
+                .putExtra("widgetRecurrence", event.optString("recurrenceKey"))
+                .putExtra("widgetStart", start);
+        row.setOnClickFillInIntent(R.id.widget_event_row, click);
+        return row;
+    }
+
     private static String content(String json, boolean todo, int limit) {
+        return String.join("\n", contentLines(json, todo, limit));
+    }
+
+    static List<String> contentLines(String json, boolean todo, int limit) {
         try {
             JSONArray rows = new JSONArray(json);
             List<JSONObject> visible = new ArrayList<>();
@@ -219,7 +302,9 @@ final class HomeWidgetRenderer {
                     if (!item.optBoolean("done", false)) visible.add(item);
                 } else {
                     String date = item.optString("date", "");
-                    if (!date.isEmpty() && !LocalDate.parse(date).isBefore(today)) visible.add(item);
+                    try {
+                        if (!date.isEmpty() && !LocalDate.parse(date).isBefore(today)) visible.add(item);
+                    } catch (java.time.format.DateTimeParseException ignored) {}
                 }
             }
             if (!todo) visible.sort(Comparator.comparing(item -> item.optString("date") + "T" + item.optString("start")));
@@ -235,13 +320,13 @@ final class HomeWidgetRenderer {
                 } else {
                     String date = item.optString("date", "");
                     String time = item.optBoolean("allDay", false) ? "全天" : item.optString("start", "");
-                    lines.add((date.equals(today.toString()) ? time : date.substring(5) + " " + time) + "  " + title);
+                    lines.add((date.equals(today.toString()) ? time : date.substring(5) + " " + time) + "\n" + title);
                 }
             }
-            if (!lines.isEmpty()) return String.join("\n", lines);
-            return todo ? "目前沒有待辦事項" : "近期沒有行程";
+            if (!lines.isEmpty()) return lines;
+            return java.util.Collections.singletonList(todo ? "目前沒有待辦事項" : "近期沒有行程");
         } catch (Exception error) {
-            return todo ? "無法讀取待辦事項" : "無法讀取行程";
+            return java.util.Collections.singletonList(todo ? "無法讀取待辦事項" : "無法讀取行程");
         }
     }
 }
