@@ -222,7 +222,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
       return html(res, 200, fs.readFileSync(path.join(root, 'index.html'), 'utf8'));
     }
-    if (req.method === 'GET' && ['/vendor/ical.js','/calendar-ics.js','/booking-client.js','/ai-request.js', '/ai-planner.js', '/ai-browser.js','/calendar-core.js','/enhancements.js','/sw.js','/manifest.webmanifest','/localization-data.js','/localization-core.js','/localization-client.js','/localization.css'].includes(url.pathname)) {
+    if (req.method === 'GET' && ['/vendor/ical.js','/calendar-ics.js','/booking-client.js','/drive-config.js','/drive-sync-core.js','/drive-sync.js','/ai-request.js', '/ai-planner.js', '/ai-browser.js','/calendar-core.js','/enhancements.js','/sw.js','/manifest.webmanifest','/localization-data.js','/localization-core.js','/localization-client.js','/localization.css'].includes(url.pathname)) {
       res.writeHead(200, { 'Content-Type': url.pathname.endsWith('.webmanifest') ? 'application/manifest+json' : url.pathname.endsWith('.css') ? 'text/css; charset=utf-8' : 'text/javascript; charset=utf-8', 'Cache-Control': 'no-cache' });
       return res.end(fs.readFileSync(path.join(root, url.pathname.slice(1)), 'utf8'));
     }

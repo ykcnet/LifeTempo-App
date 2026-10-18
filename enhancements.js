@@ -208,6 +208,12 @@ render = function () {
       };
     }
     main?.append(syncPanel);
+    window.LifeTempoDriveSync?.mount(syncPanel);
+    if(syncState.connected&&!window.LifeTempoWidget){
+      const disconnect=document.createElement('button');disconnect.type='button';disconnect.textContent='中斷伺服器同步';
+      disconnect.onclick=()=>{window.LifeTempoCalendarSync.disconnect();render()};
+      syncPanel.querySelector('#calendarSyncConnect').closest('.tool-row').append(disconnect);
+    }
     syncPanel.querySelector('#calendarSyncConnect').onclick=()=>syncState.connected&&!window.LifeTempoWidget?window.LifeTempoCalendarSync.sync():window.LifeTempoCalendarSync.connect();
     syncPanel.querySelector('#calendarSyncReconnect')?.addEventListener('click',window.LifeTempoCalendarSync.reconnect);
     syncPanel.querySelector('#calendarSyncUseServer')?.addEventListener('click',()=>{

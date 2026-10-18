@@ -117,6 +117,8 @@ async function connectAndroidAIBackend(){
 }
 
 async function connectCalendarSync(forceNewToken=false){
+  if(window.LifeTempoDriveSync?.isConnected()){setCalendarSyncStatus('請先中斷 Google Drive 同步');return false;}
+  sessionStorage.removeItem('lifetempo.serverSyncPaused');
   try{
     let useFreshToken=forceNewToken;
     if(window.LifeTempoWidget){
@@ -237,6 +239,8 @@ async function writeCalendarSync(state,text,hash,revision){
 }
 
 async function syncCalendarData({silent=false}={}){
+  if(sessionStorage.getItem('lifetempo.serverSyncPaused'))return false;
+  if(window.LifeTempoDriveSync?.isConnected()){setCalendarSyncStatus('Google Drive 同步已連線，請先中斷再使用伺服器同步');return false;}
   const token=calendarSyncToken();
   if(!token){setCalendarSyncStatus('尚未連線同步伺服器');return false;}
   if(calendarSyncRunning||!navigator.onLine)return false;
@@ -295,7 +299,8 @@ async function keepLocalCalendarSync(){
 }
 
 window.LifeTempoCalendarSync={
-  getState:()=>({connected:!!calendarSyncToken()&&(!window.LifeTempoWidget||!!localStorage.getItem(calendarSyncServerUrlKey)),status:calendarSyncStatus,conflict:!!calendarSyncConflict}),
+  disconnect:()=>{sessionStorage.setItem('lifetempo.serverSyncPaused','1');clearTimeout(calendarSyncTimer);calendarSyncConflict=null;setCalendarSyncStatus('已暫停伺服器同步；其他服務連線不受影響');},
+  getState:()=>({connected:!sessionStorage.getItem('lifetempo.serverSyncPaused')&&!!calendarSyncToken()&&(!window.LifeTempoWidget||!!localStorage.getItem(calendarSyncServerUrlKey)),running:calendarSyncRunning,status:calendarSyncStatus,conflict:!!calendarSyncConflict}),
   connect:()=>connectCalendarSync(),reconnect:()=>connectCalendarSync(true),sync:()=>syncCalendarData(),useServer:useServerCalendarSync,keepLocal:keepLocalCalendarSync
 };
 

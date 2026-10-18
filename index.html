@@ -207,6 +207,14 @@ select option{font-size:1rem}.ai-select{width:100%;padding:8px 10px;border-radiu
 @media(min-width:651px){#aiPlanBtn{display:none!important}}
 /* Desktop calendar: compact columns and a consistent light/dark palette. */
 @media(min-width:651px){
+  .bottom-nav{position:fixed;inset:auto 0 0;z-index:6;display:flex;justify-content:center;align-items:center;gap:8px;min-height:64px;padding:8px 16px;background:#fff;border-top:1px solid var(--line);box-shadow:0 -3px 14px #18203512}
+  .bottom-nav button{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;min-width:88px;padding:8px 14px;border:0;border-radius:8px;background:transparent;color:var(--muted);font-family:inherit;font-size:.875rem;line-height:1.5;cursor:pointer}
+  .bottom-nav button:hover,.bottom-nav button.active{background:#f0edff;color:#6551ce}
+  body.dark .bottom-nav{background:#222635;border-color:var(--line)}
+  body.dark .bottom-nav button:hover,body.dark .bottom-nav button.active{background:#393354;color:#eeeaff}
+  .app{padding-bottom:100px}
+}
+@media(min-width:651px){
   .sidebar{min-width:0;gap:22px;scrollbar-gutter:stable;padding-inline:12px}
   .sidebar>section,.sidebar .mini-cal{min-width:0}
   .mini-cal{padding:0 2px}
@@ -1031,7 +1039,7 @@ let firedReminders=new Set();
 function reminderOffset(label){if(label==='事件當下')return 0;const m=label.match(/提前\s*(\d+)\s*(分鐘|小時|天|週)/);if(!m)return null;return Number(m[1])*({分鐘:60000,小時:3600000,天:86400000,週:604800000}[m[2]])}
 function checkReminders(){if(!('Notification'in window)||Notification.permission!=='granted')return;const now=Date.now(),offsets=events.flatMap(e=>(e.reminders||[]).map(reminderOffset)).filter(n=>n!==null),from=new Date(now-2*86400000),to=new Date(now+Math.max(60000,...offsets)+2*86400000);for(const occ of expandEvents(from,to)){for(const r of occ.reminders||[]){const offset=reminderOffset(r);if(offset===null)continue;const [y,m,d]=occ.occurrence.split('-').map(Number),[h,min]=(occ.allDay?'00:00':occ.start||'09:00').split(':').map(Number),when=(occ.startInstant??CalendarCore.instant(occ.occurrence,occ.allDay?'00:00':occ.start||'09:00',occ.timezone||Intl.DateTimeFormat().resolvedOptions().timeZone))-offset,key=`${occ.id}:${occ.recurrenceKey||occ.occurrence}:${r}`;if(!firedReminders.has(key)&&when<=now&&when>now-60000){new Notification(occ.title,{body:`${r==='事件當下'?'現在開始':'即將開始'}${occ.place?' · '+occ.place:''}`,icon:'LifeTempo-Icons/windows/LifeTempo-512.png'});firedReminders.add(key)}}}}
 setInterval(checkReminders,15000);
-</script><script src="enhancements.js"></script><script src="localization-client.js"></script></body></html>
+</script><script src="drive-config.js"></script><script src="drive-sync-core.js"></script><script src="drive-sync.js"></script><script src="enhancements.js"></script><script src="localization-client.js"></script></body></html>
 
 
 
