@@ -1,0 +1,20 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_event_row"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+    <ImageView
+        android:id="@+id/widget_event_divider"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="8dp"
+        android:background="#D8DCE3"
+        android:importantForAccessibility="no" />
+    <TextView
+        android:id="@+id/widget_event_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textColor="#4d5361"
+        android:textSize="12sp" />
+</LinearLayout>

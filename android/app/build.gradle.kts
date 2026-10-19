@@ -30,8 +30,8 @@ android {
         applicationId = "com.ykcnet.lifetempo"
         minSdk = 26
         targetSdk = 35
-        versionCode = 11
-        versionName = "1.1.0"
+        versionCode = 17
+        versionName = "1.1.6"
     }
 
     signingConfigs {
@@ -56,6 +56,7 @@ android {
 }
 
 dependencies {
+    implementation("com.google.android.gms:play-services-auth:22.0.0")
     implementation("androidx.webkit:webkit:1.12.1")
 }
 

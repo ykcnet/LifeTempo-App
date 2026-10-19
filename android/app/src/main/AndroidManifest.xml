@@ -41,12 +41,40 @@
             </intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/todo_widget_info" />
         </receiver>
+        <activity android:name=".WidgetSettingsActivity" android:exported="false"
+            android:taskAffinity="" android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Material.Light.Dialog.NoActionBar" />
+        <activity android:name=".TodoAddActivity" android:exported="false"
+            android:taskAffinity="" android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Material.Light.Dialog.NoActionBar" />
+        <activity android:name=".TodoWidgetActionActivity" android:exported="false"
+            android:theme="@android:style/Theme.NoDisplay"
+            android:excludeFromRecents="true" android:taskAffinity="" />
+        <service android:name=".TodoWidgetService"
+            android:exported="false"
+            android:permission="android.permission.BIND_REMOTEVIEWS" />
+        <receiver android:name=".CalendarWidgetActionsReceiver" android:exported="false" />
+        <activity android:name=".CalendarWidgetActionActivity" android:exported="false"
+            android:theme="@android:style/Theme.NoDisplay"
+            android:excludeFromRecents="true" android:taskAffinity="" />
+        <receiver android:name=".WidgetRefreshReceiver" android:exported="false">
+            <intent-filter><action android:name="android.intent.action.MY_PACKAGE_REPLACED" /></intent-filter>
+        </receiver>
+        <service android:name=".UpcomingWidgetService"
+            android:exported="false"
+            android:permission="android.permission.BIND_REMOTEVIEWS" />
         <receiver
             android:name=".CalendarWidgetProvider"
             android:exported="true"
             android:label="@string/calendar_widget_name">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.ykcnet.lifetempo.widget.PREVIOUS_MONTH" />
+                <action android:name="com.ykcnet.lifetempo.widget.NEXT_MONTH" />
+                <action android:name="com.ykcnet.lifetempo.widget.TODAY" />
+                <data android:scheme="lifetempo" android:host="calendar" />
             </intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/calendar_widget_info" />
         </receiver>

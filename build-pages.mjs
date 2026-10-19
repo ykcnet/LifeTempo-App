@@ -6,7 +6,7 @@ const root=path.dirname(fileURLToPath(import.meta.url));
 const output=path.join(root,'_site');
 const files=[
   '.nojekyll','index.html','manifest.webmanifest','sw.js','calendar-core.js','calendar-ics.js',
-  'ai-request.js','booking-client.js','enhancements.js','localization-data.js',
+  'ai-request.js','booking-client.js','drive-config.js','drive-sync-core.js','drive-sync.js','enhancements.js','localization-data.js',
   'localization-core.js','localization-client.js','localization.css','vendor/ical.js',
   'LifeTempo-Icons/android/play-store-512.png','LifeTempo-Icons/source/LifeTempo-rounded.svg',
   'LifeTempo-Icons/windows/LifeTempo.ico','LifeTempo-Icons/windows/LifeTempo-512.png',

@@ -28,15 +28,34 @@ let homeScroll = false;
 const isMobileExperience = () => !!window.LifeTempoWidget || location.hostname === 'appassets.androidplatform.net' || !!window.matchMedia?.('(max-width:650px)').matches;
 function prepareBottomNavigation(nextView){
   query='';
-  if(nextView==='日')cursor=new Date(today);
+  if(nextView==='日')cursor=parse(iso(new Date()));
+}
+let calendarScrollRevision=0;
+function scheduleCalendarScroll(callback){
+  const revision=++calendarScrollRevision;
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{if(revision===calendarScrollRevision)callback();}));
+}
+function focusCalendarPosition(date,event){
+  scheduleCalendarScroll(()=>{
+    const day=document.querySelector(`.day-col[data-dropdate="${date}"]`);
+    const target=event&&[...(day?.querySelectorAll('[data-edit]')||[])].find(el=>
+      el.dataset.edit===String(event.id)&&el.dataset.recurrence===String(event.recurrenceKey||event.date));
+    const header=document.querySelector(`.day-head[data-local-date="${date}"]`);
+    const monthDay=document.querySelector(`.month-cell[data-day="${date}"]`);
+    const anchor=target||header||monthDay;
+    if(!anchor)return;
+    anchor.style.scrollMarginTop='12px';
+    anchor.scrollIntoView({block:monthDay&&!target&&!header?'center':'start',inline:'center',behavior:'instant'});
+    if(target)target.classList.add('widget-focused-event');
+  });
 }
 function scrollNavigationToTop(){
-  requestAnimationFrame(()=>{
+  scheduleCalendarScroll(()=>{
     const home=typeof homeScroll!=='undefined'&&homeScroll;
     const grid=home?null:document.querySelector('.workspace-calendar .main>.card:not(.local-weather)');
-    if(grid?.scrollIntoView)return grid.scrollIntoView({block:'start',behavior:'smooth'});
-    window.scrollTo({top:0,behavior:'smooth'});
-    document.querySelector('.main')?.scrollTo?.({top:0,behavior:'smooth'});
+    if(grid?.scrollIntoView)return grid.scrollIntoView({block:'start',behavior:'instant'});
+    window.scrollTo({top:0,behavior:'instant'});
+    document.querySelector('.main')?.scrollTo?.({top:0,behavior:'instant'});
   });
 }
 document.addEventListener('click', event => {
@@ -47,6 +66,10 @@ document.addEventListener('click', event => {
     query='';
     if (button.matches('.bottom-nav [data-goview]')) prepareBottomNavigation(nextView);
     if(!nextView||nextView===view)scrollNavigationToTop();
+    if(button.id==='today'||button.matches('.bottom-nav [data-goview="日"]')) {
+      cursor=parse(iso(new Date()));
+      requestAnimationFrame(()=>focusCalendarPosition(iso(cursor)));
+    }
   }
   if (nextView && nextView !== view) {
     pageViewBack.push(view);
@@ -120,7 +143,7 @@ render = function () {
   const workspaceNav = document.querySelector('.nav');
   const manageSharedButton = workspaceNav?.querySelector('[data-goview="共享"]');
   if (manageSharedButton) {
-    manageSharedButton.innerHTML = '<span class="icon">♧</span>管理共享與權限';
+    manageSharedButton.innerHTML = '<span class="icon" aria-hidden="true">♧</span><span class="nav-action-label">管理共享與權限</span>';
     const helpButton = manageSharedButton.nextElementSibling;
     if (helpButton?.classList.contains('help-btn')) {
       helpButton.dataset.helpTitle = '管理共享與權限說明';
@@ -185,6 +208,12 @@ render = function () {
       };
     }
     main?.append(syncPanel);
+    window.LifeTempoDriveSync?.mount(syncPanel);
+    if(syncState.connected&&!window.LifeTempoWidget){
+      const disconnect=document.createElement('button');disconnect.type='button';disconnect.textContent='中斷伺服器同步';
+      disconnect.onclick=()=>{window.LifeTempoCalendarSync.disconnect();render()};
+      syncPanel.querySelector('#calendarSyncConnect').closest('.tool-row').append(disconnect);
+    }
     syncPanel.querySelector('#calendarSyncConnect').onclick=()=>syncState.connected&&!window.LifeTempoWidget?window.LifeTempoCalendarSync.sync():window.LifeTempoCalendarSync.connect();
     syncPanel.querySelector('#calendarSyncReconnect')?.addEventListener('click',window.LifeTempoCalendarSync.reconnect);
     syncPanel.querySelector('#calendarSyncUseServer')?.addEventListener('click',()=>{
@@ -204,8 +233,15 @@ render = function () {
     });
   };
   $('.bottom-nav')?.append(more);
+  syncTopNavHeight();
   applyAccent();
 };
+function syncTopNavHeight(){
+  const nav=document.querySelector('.bottom-nav');
+  if(!nav||!window.matchMedia?.('(max-width:650px)').matches)return;
+  document.documentElement.style.setProperty('--top-nav-h',Math.ceil(nav.getBoundingClientRect().height)+'px');
+}
+window.addEventListener('resize',syncTopNavHeight);
 function applyAccent(){const accent=localStorage.getItem('lifetempo.accent');if(/^#[a-f\d]{6}$/i.test(accent||''))document.documentElement.style.setProperty('--purple',accent);}
 
 const originalOpenModal = openModal;
@@ -475,3 +511,106 @@ render=function(){
   }
 };
 render();
+
+// Resolve widget navigation after timezone conversion and all render extensions.
+function nearestWidgetEvent(items, now) {
+  const date = iso(now), minute = now.getHours() * 60 + now.getMinutes();
+  return items.map(event => {
+    const day = event.displayDate || event.occurrence || event.date;
+    const [hour, minutes] = (event.start || '00:00').split(':').map(Number);
+    const distance = (parse(day) - parse(date)) / 86400000 * 1440 +
+      (event.allDay ? 0 : hour * 60 + minutes) - minute;
+    return {event, distance: event.allDay && day === date ? 0 : distance};
+  }).filter(item => Number.isFinite(item.distance))
+    .sort((a, b) => Math.abs(a.distance) - Math.abs(b.distance))[0]?.event;
+}
+function selectWidgetEvent(items, params, now) {
+  const id=params.get('widgetEventId'), recurrence=params.get('widgetRecurrence'), start=params.get('widgetStart');
+  if(id) return items.find(event=>String(event.id)===id && (!recurrence||String(event.recurrenceKey||event.date)===recurrence));
+  if(start) return items.find(event=>event.start===start);
+  return nearestWidgetEvent(items,now);
+}
+function focusUpcomingWidget() {
+  const params=new URLSearchParams(location.search), date=params.get('widgetDate');
+  const validDate=date && /^\d{4}-\d{2}-\d{2}$/.test(date) && !Number.isNaN(parse(date).getTime());
+  if (widgetLaunch === 'calendar') {
+    if (validDate) cursor = parse(date);
+    view = '月';
+    render();
+    scheduleCalendarScroll(()=>document.querySelector('.month-grid')?.scrollIntoView({block:'start',behavior:'instant'}));
+    return;
+  }
+  if (widgetLaunch === 'todo') {
+    view='待辦'; query=''; render();
+    scheduleCalendarScroll(()=>{window.scrollTo(0,0);document.querySelector('.main')?.scrollTo?.(0,0);});
+    return;
+  }
+  if (widgetLaunch !== 'today') return;
+  const now=new Date(), from=validDate?parse(date):now, end=new Date(from);
+  if(!validDate)end.setDate(end.getDate()+30);
+  const event=selectWidgetEvent(expandEvents(from,end),params,now);
+  cursor=validDate?parse(date):event?parse(event.displayDate||event.occurrence||event.date):parse(iso(now));
+  view='週'; query=''; category='全部'; calendarFilter=''; attendeeFilter='';
+  render();
+  focusCalendarPosition(iso(cursor),event);
+}
+let widgetRevealRevision=0;
+function revealWidgetDestination(){
+  const revision=++widgetRevealRevision;
+  // Focus uses two frames for layout. Reveal only after the final scroll is applied.
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    if(revision===widgetRevealRevision)document.documentElement.classList.remove('widget-launch-pending');
+  }));
+}
+window.navigateFromWidget=function(destination){
+  const url=new URL(destination,location.href),type=url.searchParams.get('widget');
+  if(url.origin!==location.origin||url.pathname!==location.pathname||!['today','calendar','todo'].includes(type))return false;
+  history.replaceState(null,'',url.pathname+url.search);
+  widgetLaunch=type;homeScroll=false;query='';category='全部';calendarFilter='';attendeeFilter='';
+  document.documentElement.classList.add('widget-launch-pending');
+  window.applyWidgetTodoOps?.();
+  try {focusUpcomingWidget();} finally {revealWidgetDestination();}
+  return true;
+};
+document.addEventListener('DOMContentLoaded',()=>{
+  if(!['today','calendar','todo'].includes(widgetLaunch))return;
+  try {focusUpcomingWidget();} finally {revealWidgetDestination();}
+},{once:true});
+
+// "+N" block in a crowded time slot lists every concurrent event; picking one opens its editor.
+function openConcurrentEvents(more){
+  const items=[...document.querySelectorAll(`[data-more-group="${more.dataset.moreGroup}"][data-edit]`)];
+  if(!items.length)return;
+  root.insertAdjacentHTML('beforeend',`<div class="modal-wrap" id="moreWrap"><section class="modal"><h2>同時段行程</h2>${items.map((el,i)=>`<button type="button" class="tool-row" data-more-pick="${i}" style="display:block;width:100%;text-align:left;margin-bottom:8px">${esc(el.querySelector('b')?.textContent||'')}<small style="display:block">${esc(el.querySelector('small')?.textContent||'')}</small></button>`).join('')}<div class="modal-actions"><button type="button" class="cancel" id="moreClose">關閉</button></div></section></div>`);
+  const wrap=document.getElementById('moreWrap');
+  wrap.onclick=event=>{if(event.target===wrap)wrap.remove()};
+  wrap.querySelector('#moreClose').onclick=()=>wrap.remove();
+  wrap.querySelectorAll('[data-more-pick]').forEach(button=>button.onclick=()=>{wrap.remove();items[Number(button.dataset.morePick)].click()});
+}
+document.addEventListener('click',event=>{const more=event.target.closest('.event-more');if(more)openConcurrentEvents(more)});
+document.addEventListener('keydown',event=>{if(event.key!=='Enter'&&event.key!==' ')return;const more=event.target.closest?.('.event-more');if(more){event.preventDefault();openConcurrentEvents(more)}});
+
+// Todo edits made on the Android home-screen widget are queued natively and imported here.
+window.applyWidgetTodoOps=function(){
+  if(typeof window.LifeTempoWidget?.takeTodoOps!=='function')return;
+  let ops;try{ops=JSON.parse(window.LifeTempoWidget.takeTodoOps()||'[]')}catch{return}
+  if(!Array.isArray(ops)||!ops.length)return;
+  let changed=false;const planned=[];
+  for(const op of ops){
+    if(!op||typeof op.id!=='string')continue;
+    if(op.type==='done'){
+      const task=tasks.find(item=>item.id===op.id);
+      if(task&&!task.done){task.done=true;changed=true}
+    }else if(op.type==='add'&&typeof op.title==='string'&&op.title.trim()&&!tasks.some(item=>item.id===op.id)){
+      tasks.push({id:op.id,title:op.title.trim().slice(0,200),due:/^\d{4}-\d{2}-\d{2}$/.test(op.due||'')?op.due:iso(new Date()),done:false});
+      changed=true;if(op.mode==='plan')planned.push(op.id);
+    }
+  }
+  if(!changed)return;
+  saveTasks();
+  for(const id of planned){if(!tasks.find(item=>item.id===id)?.done)scheduleTask(id,{navigate:false})}
+  render();
+};
+window.applyWidgetTodoOps();
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)window.applyWidgetTodoOps()});
+window.addEventListener('focus',()=>window.applyWidgetTodoOps());

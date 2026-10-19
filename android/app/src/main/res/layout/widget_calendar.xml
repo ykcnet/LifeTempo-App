@@ -4,7 +4,7 @@
     android:layout_height="match_parent"
     android:background="@drawable/widget_background"
     android:orientation="vertical"
-    android:padding="10dp">
+    android:padding="2dp">
     <LinearLayout
         android:id="@+id/calendar_month_bar"
         android:layout_width="match_parent"
@@ -12,13 +12,17 @@
         android:background="@drawable/widget_calendar_header"
         android:gravity="center_vertical"
         android:orientation="horizontal">
-        <TextView
+        <Button
             android:id="@+id/calendar_month_prev"
             android:layout_width="40dp"
             android:layout_height="match_parent"
-            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:background="@android:color/transparent"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:padding="0dp"
             android:contentDescription="上一個月"
-            android:focusable="true"
+            android:clickable="true"
+            android:focusable="false"
             android:gravity="center"
             android:text="‹"
             android:textColor="#FFFFFF"
@@ -33,13 +37,36 @@
             android:textColor="#FFFFFF"
             android:textSize="14sp"
             android:textStyle="bold" />
-        <TextView
+        <Button
+            android:id="@+id/calendar_month_today"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_marginEnd="4dp"
+            android:background="@android:color/transparent"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:padding="0dp"
+            android:contentDescription="回到當月"
+            android:clickable="true"
+            android:focusable="false"
+            android:gravity="center"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:text="今天"
+            android:textColor="#FFFFFF"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+        <Button
             android:id="@+id/calendar_month_next"
             android:layout_width="40dp"
             android:layout_height="match_parent"
-            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:background="@android:color/transparent"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:padding="0dp"
             android:contentDescription="下一個月"
-            android:focusable="true"
+            android:clickable="true"
+            android:focusable="false"
             android:gravity="center"
             android:text="›"
             android:textColor="#FFFFFF"
