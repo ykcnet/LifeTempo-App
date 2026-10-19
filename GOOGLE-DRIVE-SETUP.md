@@ -1,6 +1,7 @@
 # LifeTempo 桌面版 Google Drive 同步設定
 
 本次僅實作桌面瀏覽器與安裝式 PWA。Android 原生版維持原狀，待桌面版定案後再實作。
+桌面瀏覽器與安裝式 PWA 使用 Google Identity Services 網頁授權；Android 使用 Google Play services 原生授權 API。兩者共用相同 Drive App 專屬空間與同步版本格式。
 已於 2026-10-18 在 lifetempo-512012 專案建立 LifeTempo Desktop Web 網頁用戶端，並將公開 ID 寫入 drive-config.js。Google Drive API 已啟用，已宣告 drive.appdata 範圍，專案擁有者已加入測試使用者。目前仍為測試模式，尚未完成真實帳號同步實測或對外發布。
 
 ## 一、開發者一次性設定
@@ -21,6 +22,10 @@
 7. 將網頁用戶端 ID 填入 `drive-config.js` 的 `webClientId`。
    此 ID 是公開設定，不是密碼；不要把 OAuth client secret、access token 或 refresh token 放進原始碼。
 8. 本機重新整理頁面測試；GitHub Pages 需將變更正式發布後才會生效。
+   8. 在同一 Google Cloud 專案新增 **Android** OAuth 用戶端，套件名稱填 `com.ykcnet.lifetempo`，SHA-1 指紋填 `3B:01:52:AB:C7:B6:16:AD:42:F8:2A:9F:40:17:C6:7E:4D:CE:D8:F1`。此值已由正式 release APK 簽章驗證；不要將 keystore 或密碼提交到版本庫。Android 不使用網頁用戶端 ID。
+   9. 本機重新整理頁面測試；GitHub Pages 需將變更正式發布後才會生效。
+   6. 關閉或重新載入 App／頁面後，需要使用者再次點擊連接。Android 由 Google Play services 顯示原生帳號與授權流程；桌面網頁使用 GIS token popup。程式不偷偷開啟登入視窗，也不將存取憑證寫入 localStorage。
+   9. Android release APK 需安裝在有 Google Play services 的裝置；測試帳號須列在 OAuth 同意畫面的測試使用者。未配置開發者 OAuth 時，顯示「Google 同步服務準備中」且連線按鍵停用；這是維護者一次性工作，不要求一般使用者自行設定。
    安裝式桌面 PWA 使用相同網站，不需要另外安裝桌面套件。
 
 一般使用者不需建立 Cloud 專案，只需使用自己的 Google 帳號授權。

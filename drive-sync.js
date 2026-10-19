@@ -1,18 +1,19 @@
 (function(){
   'use strict';
-  if(window.LifeTempoWidget)return; // Desktop approval first; native integration is deferred.
   const C=window.LifeTempoDriveCore,SCOPE='https://www.googleapis.com/auth/drive.appdata';
   const API='https://www.googleapis.com/drive/v3',PREFIX='lifetempo-sync-v1-',KEY='lifetempo.drive.';
   const MAX_BYTES=5_000_000;
   let token='',expires=0,account=null,busy=false,conflict=null,status='尚未連接 Google Drive',authClient=null;
-  let libraryPromise=null,libraryFailed=false,session=0;
-  const configured=()=>!!window.LifeTempoDriveConfig?.webClientId;
+  let libraryPromise=null,libraryFailed=false,session=0,nativeAuthSequence=0,conflictPreviews=new Map();
+  const nativeAuthRequests=new Map();
+  const hasNativeAuth=()=>typeof window.LifeTempoDriveNative?.authorize==='function';
+  const configured=()=>hasNativeAuth()||!!window.LifeTempoDriveConfig?.webClientId;
   const snapshot=()=>C.validate(calendarSyncSnapshot());
   const baseKey=()=>KEY+'base.'+account.permissionId;
   function base(){try{return JSON.parse(localStorage.getItem(baseKey()))||{}}catch{return {}}}
   const hash=async state=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(C.canonical(state))))).map(b=>b.toString(16).padStart(2,'0')).join('');
   function setStatus(text){status=text;paint();}
-  function remember(digest){localStorage.setItem(baseKey(),JSON.stringify({hash:digest,time:new Date().toISOString()}));conflict=null;}
+  function remember(digest){localStorage.setItem(baseKey(),JSON.stringify({hash:digest,time:new Date().toISOString()}));conflict=null;conflictPreviews.clear();}
   function connected(){return !!token&&Date.now()<expires&&!!account;}
   async function request(url,options={}){
     if(!token||Date.now()>=expires)throw Error('授權已到期，請按「連接 Google Drive」重新授權；本機修改仍已保留');
@@ -80,7 +81,7 @@
       throw Error('無法套用雲端資料，已嘗試還原本機版本；同步前備份仍保留。'+error.message);
     }
   }
-  function conflictWith(rows){conflict=rows;setStatus('版本有差異，請選擇保留版本；尚未覆蓋任何資料');}
+  function conflictWith(rows){conflict=rows;conflictPreviews=new Map();setStatus('版本有差異，請先查看內容，再選擇保留版本；尚未覆蓋任何資料');}
   function assertSession(id){if(id!==session)throw Error('連線已變更，請重新同步');}
   async function sync(){
     if(busy)return;
@@ -130,6 +131,20 @@
     }catch(error){setStatus(error.message||'處理失敗，原有資料已保留');}
     finally{busy=false;paint();}
   }
+  async function previewVersion(id){
+    if(busy||!conflict)return;
+    if(conflictPreviews.has(id)){conflictPreviews.delete(id);paint();return;}
+    const currentConflict=conflict;
+    const row=id==='local'?null:currentConflict.find(item=>item.id===id);
+    if(id!=='local'&&!row)return;
+    busy=true;setStatus('正在讀取版本內容…');
+    try{
+      const state=id==='local'?snapshot():await download(row);
+      if(conflict!==currentConflict)return;
+      conflictPreviews.set(id,state);status='已載入版本內容，確認後再選擇要保留的版本';
+    }catch(error){setStatus(error.message||'無法讀取版本內容');}
+    finally{busy=false;paint();}
+  }
   function loadLibrary(){
     if(window.google?.accounts?.oauth2)return Promise.resolve();
     if(!libraryPromise)libraryPromise=new Promise((resolve,reject)=>{
@@ -153,12 +168,27 @@
     }catch(error){token='';account=null;busy=false;setStatus(error.message);}
     finally{paint();}
   }
+  function requestNativeToken(){
+    const requestId=String(++nativeAuthSequence);
+    return new Promise((resolve,reject)=>{
+      nativeAuthRequests.set(requestId,{resolve,reject});
+      try{window.LifeTempoDriveNative.authorize(requestId);}
+      catch(error){nativeAuthRequests.delete(requestId);reject(error);}
+    });
+  }
+  function completeNativeAuthorization(requestId,accessToken,error){
+    const pending=nativeAuthRequests.get(requestId);if(!pending)return;
+    nativeAuthRequests.delete(requestId);
+    if(error||!accessToken)pending.reject(Error(error||'Google 授權未完成'));
+    else pending.resolve({access_token:accessToken,expires_in:3500});
+  }
   function connect(){
     if(busy)return;
     if(!configured()){setStatus('Google 同步服務尚未開通，請聯絡 LifeTempo 維護者；您不需要自行設定 Google Cloud。');return;}
     const server=window.LifeTempoCalendarSync?.getState();
     if(server?.connected||server?.running){setStatus('請先暫停伺服器同步並等待完成，再連接 Google Drive');return;}
     busy=true;setStatus('請在 Google 視窗選擇帳號並授權…');
+    if(hasNativeAuth())return requestNativeToken().then(acceptToken).catch(error=>{busy=false;setStatus(error.message||'Google 授權失敗');paint();});
     if(!window.google?.accounts?.oauth2){busy=false;prepareConnection();return;}
     authClient=google.accounts.oauth2.initTokenClient({client_id:window.LifeTempoDriveConfig.webClientId,scope:SCOPE,
       callback:acceptToken,error_callback:()=>{busy=false;setStatus('授權視窗已關閉或被阻擋，請重新連接')}});
@@ -176,6 +206,7 @@
   function recovery(){
     const text=localStorage.getItem(KEY+'recovery');if(!text){setStatus('目前沒有同步前的復原備份');return;}
     const data=JSON.parse(text);const content=JSON.stringify(data.state,null,2);
+    if(window.LifeTempoFiles?.saveText){window.LifeTempoFiles.saveText('lifetempo-drive-recovery.json','application/json',content);return;}
     const url=URL.createObjectURL(new Blob([content],{type:'application/json'})),a=document.createElement('a');
     a.href=url;a.download='lifetempo-drive-recovery.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   }
@@ -196,7 +227,7 @@
     const last=account?base().time:null;
     panel.querySelector('[data-drive-last]').textContent=last?'最後同步：'+new Date(last).toLocaleString():'';
     for(const button of panel.querySelectorAll('button'))button.disabled=busy;
-    const active=connected(),ready=!!window.google?.accounts?.oauth2;
+    const active=connected(),ready=hasNativeAuth()||!!window.google?.accounts?.oauth2;
     const mainButton=panel.querySelector('[data-drive-connect]');
     mainButton.disabled=busy||!configured()||(!ready&&!libraryFailed);
     mainButton.hidden=active;
@@ -211,15 +242,28 @@
     const box=panel.querySelector('[data-drive-conflict]');box.replaceChildren();box.hidden=!conflict;
     if(conflict){
       const p=document.createElement('p');p.textContent='請選擇完整版本。採用雲端版本會取代本機行程、待辦與同步設定；其他版本會保留於 Drive。';box.append(p);
-      const local=document.createElement('button');local.type='button';local.textContent='保留此裝置版本';local.disabled=busy;local.onclick=()=>resolve('local');box.append(local);
-      for(const row of conflict){const b=document.createElement('button');b.type='button';b.disabled=busy;b.textContent=`採用雲端版本 · ${row.device||'其他裝置'} · ${new Date(row.time).toLocaleString()}`;b.onclick=()=>resolve(row.id);box.append(b);}
+      const localChoice=document.createElement('div');localChoice.className='tool-row';
+      const local=document.createElement('button');local.type='button';local.textContent='保留此裝置版本';local.disabled=busy;local.onclick=()=>resolve('local');localChoice.append(local);
+      const localPreview=document.createElement('button');localPreview.type='button';localPreview.textContent=conflictPreviews.has('local')?'隱藏內容':'查看此裝置內容';localPreview.disabled=busy;localPreview.onclick=()=>previewVersion('local');localChoice.append(localPreview);box.append(localChoice);
+      for(const row of conflict){
+        const choice=document.createElement('div');choice.className='tool-row';
+        const select=document.createElement('button');select.type='button';select.disabled=busy;select.textContent=`採用雲端版本 · ${row.device||'其他裝置'} · ${new Date(row.time).toLocaleString()}`;select.onclick=()=>resolve(row.id);choice.append(select);
+        const preview=document.createElement('button');preview.type='button';preview.disabled=busy;preview.textContent=conflictPreviews.has(row.id)?'隱藏內容':'查看內容';preview.onclick=()=>previewVersion(row.id);choice.append(preview);box.append(choice);
+      }
+      for(const [id,state] of conflictPreviews){
+        const source=id==='local'?'此裝置版本':`雲端版本 · ${conflict.find(row=>row.id===id)?.device||'其他裝置'}`;
+        const details=document.createElement('details');details.open=true;
+        const summary=document.createElement('summary');summary.textContent=source;details.append(summary);
+        const info=document.createElement('p');info.textContent=`${state.events.length} 筆行程 · ${state.tasks.length} 筆待辦 · ${state.settings.timezone} · ${state.settings.clockFormat} 小時制`;details.append(info);
+        const lines=['行程：',...state.events.map(event=>`${event.date} ${event.allDay?'全天':`${event.start}-${event.end}`} ${event.title}`),'','待辦：',...state.tasks.map(task=>`${task.done?'已完成':'未完成'} ${task.due||''} ${task.title||''}`)];
+        const content=document.createElement('div');content.textContent=lines.join('\n');content.style.whiteSpace='pre-wrap';content.style.overflowWrap='anywhere';content.style.maxHeight='240px';content.style.overflowY='auto';details.append(content);box.append(details);
+      }
     }
   }
   function mount(parent){
-    if(window.LifeTempoWidget)return;
     if(parent.querySelector('#driveSyncPanel'))return;
     const panel=document.createElement('section');panel.id='driveSyncPanel';
-    panel.innerHTML='<h4>使用自己的 Google Drive 同步</h4><p>選擇 Google 帳號並同意授權，即可同步行程與待辦。一般使用者不需要設定伺服器或輸入金鑰。</p><ol class="import-steps" aria-label="Google Drive 連線步驟"><li data-drive-step>1. 連接 Google Drive</li><li data-drive-step>2. 選擇帳號並同意</li><li data-drive-step>3. 同步資料</li></ol><p data-drive-account></p><div class="tool-row"><button type="button" class="primary" data-drive-connect>連接 Google Drive</button><button type="button" class="primary" data-drive-sync>立即同步</button></div><p role="status" aria-live="polite" data-drive-status></p><p data-drive-last></p><div class="tool-row" role="alert" data-drive-conflict hidden></div><details><summary>連線說明</summary><p>每台桌面裝置選擇同一個 Google 帳號。首次連線會比對資料；兩端不同時，請選擇要保留的版本。資料保存在您的 Google Drive 專屬空間，AI API Key 不會上傳。</p><p>授權有效時，返回 App 或恢復網路會同步；離線修改仍保存在此裝置。重新開啟 App 或授權到期時，請再按連接按鍵。</p><p>若顯示「服務準備中」，代表維護者尚未開通服務；您不需要自行建立 Google Cloud 專案。目前先開放桌面版，手機版待後續提供。</p></details><details data-drive-options><summary>帳號與備份管理</summary><div class="tool-row"><button type="button" data-drive-switch>切換 Google 帳號</button><button type="button" data-drive-disconnect>中斷連線</button><button type="button" data-drive-recovery>匯出同步前備份</button></div><p>雲端歷史版本保留，不會自動刪除。中斷連線不會刪除資料；本機還原前會再次確認。</p></details>';
+    panel.innerHTML='<h4>使用自己的 Google Drive 同步</h4><p>選擇 Google 帳號並同意授權，即可同步行程與待辦。一般使用者不需要設定伺服器或輸入金鑰。</p><ol class="import-steps" aria-label="Google Drive 連線步驟"><li data-drive-step>1. 連接 Google Drive</li><li data-drive-step>2. 選擇帳號並同意</li><li data-drive-step>3. 同步資料</li></ol><p data-drive-account></p><div class="tool-row"><button type="button" class="primary" data-drive-connect>連接 Google Drive</button><button type="button" class="primary" data-drive-sync>立即同步</button></div><p role="status" aria-live="polite" data-drive-status></p><p data-drive-last></p><div class="tool-row" role="alert" data-drive-conflict hidden></div><details><summary>連線說明</summary><p>每台裝置選擇同一個 Google 帳號。首次連線會比對資料；兩端不同時，請選擇要保留的版本。資料保存在您的 Google Drive 專屬空間，AI API Key 不會上傳。</p><p>授權有效時，返回 App 或恢復網路會同步；離線修改仍保存在此裝置。重新開啟 App 或授權到期時，請再按連接按鍵。</p><p>若顯示「服務準備中」，代表維護者尚未開通服務；您不需要自行設定 Google Cloud 專案。</p></details><details data-drive-options><summary>帳號與備份管理</summary><div class="tool-row"><button type="button" data-drive-switch>切換 Google 帳號</button><button type="button" data-drive-disconnect>中斷連線</button><button type="button" data-drive-recovery>匯出同步前備份</button></div><p>雲端歷史版本保留，不會自動刪除。中斷連線不會刪除資料；本機還原前會再次確認。</p></details>';
     // Only reorganize the sync card: keep server controls and their handlers intact.
     const advanced=document.createElement('details');advanced.dataset.serverSyncOptions='';
     const summary=document.createElement('summary');summary.textContent='進階：自架伺服器同步';advanced.append(summary);
@@ -231,9 +275,9 @@
     panel.querySelector('[data-drive-connect]').onclick=connect;panel.querySelector('[data-drive-sync]').onclick=sync;
     panel.querySelector('[data-drive-switch]').onclick=connect;
     panel.querySelector('[data-drive-disconnect]').onclick=disconnect;panel.querySelector('[data-drive-recovery]').onclick=recovery;
-    paint();if(configured()&&!window.google?.accounts?.oauth2&&!libraryPromise)prepareConnection();
+    paint();if(configured()&&!hasNativeAuth()&&!window.google?.accounts?.oauth2&&!libraryPromise)prepareConnection();
   }
-  window.LifeTempoDriveSync={mount,sync,connect,disconnect,resolve,isConnected:()=>connected()||busy,
+  window.LifeTempoDriveSync={mount,sync,connect,disconnect,resolve,completeNativeAuthorization,isConnected:()=>connected()||busy,
     getState:()=>({connected:connected(),busy,status,account:account?.emailAddress||'',conflict:conflict?.map(row=>({...row}))||null})};
   window.addEventListener('online',()=>{if(localStorage.getItem(KEY+'enabled'))sync()});
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&localStorage.getItem(KEY+'enabled'))sync()});
