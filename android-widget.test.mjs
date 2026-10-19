@@ -101,7 +101,7 @@ test('upcoming widget selects the nearest occurrence including all-day and empty
 
 test('Android app declares installable home-screen widgets',()=>{
   assert.match(gradle,/applicationId = "com\.ykcnet\.lifetempo"/);
-  assert.match(gradle,/versionCode = 16/);
+  assert.match(gradle,/versionCode = 17/);
   assert.match(gradle,/LIFETEMPO_SIGNING_KEYSTORE/);
   assert.match(manifest,/android:allowBackup="false"/);
   assert.match(manifest,/TodayEventsWidgetProvider/);

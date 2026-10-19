@@ -39,6 +39,15 @@
         <activity android:name=".WidgetSettingsActivity" android:exported="false"
             android:taskAffinity="" android:excludeFromRecents="true"
             android:theme="@android:style/Theme.Material.Light.Dialog.NoActionBar" />
+        <activity android:name=".TodoAddActivity" android:exported="false"
+            android:taskAffinity="" android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Material.Light.Dialog.NoActionBar" />
+        <activity android:name=".TodoWidgetActionActivity" android:exported="false"
+            android:theme="@android:style/Theme.NoDisplay"
+            android:excludeFromRecents="true" android:taskAffinity="" />
+        <service android:name=".TodoWidgetService"
+            android:exported="false"
+            android:permission="android.permission.BIND_REMOTEVIEWS" />
         <receiver android:name=".CalendarWidgetActionsReceiver" android:exported="false" />
         <activity android:name=".CalendarWidgetActionActivity" android:exported="false"
             android:theme="@android:style/Theme.NoDisplay"

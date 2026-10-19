@@ -87,8 +87,26 @@ public final class MainActivity extends Activity {
                 return true;
             }
         });
+        if (android.os.Build.VERSION.SDK_INT >= 35) {
+            // Android 15 draws edge-to-edge; keep the page clear of the status and navigation bars.
+            webView.setOnApplyWindowInsetsListener((view, insets) -> {
+                android.graphics.Insets bars = insets.getInsets(
+                        android.view.WindowInsets.Type.systemBars() | android.view.WindowInsets.Type.displayCutout());
+                view.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+                return android.view.WindowInsets.CONSUMED;
+            });
+        }
         setContentView(webView);
         loadApp(getIntent());
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Import todo edits made on the home-screen widget while the app was in the background.
+        if (pageReady && webView != null) {
+            webView.evaluateJavascript("typeof window.applyWidgetTodoOps === 'function' && window.applyWidgetTodoOps()", null);
+        }
     }
 
     @Override

@@ -194,12 +194,9 @@ final class HomeWidgetRenderer {
         if (ids == null || ids.length == 0) return;
         String json = todo ? WidgetDataStore.tasks(context) : WidgetDataStore.events(context);
         for (int id : ids) {
-            Bundle options = manager.getAppWidgetOptions(id);
-            int height = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 100);
-            int rowLimit = Math.max(1, Math.min(8, (height - 50) / 27));
             RemoteViews views = new RemoteViews(context.getPackageName(), todo ? R.layout.widget_todo : R.layout.widget_today);
             views.setTextViewText(R.id.widget_title, todo ? "待辦事項" : "近日行程");
-            if (todo) views.setTextViewText(R.id.widget_content, content(json, true, rowLimit));
+            if (todo) bindTodo(context, views, id);
 
             Intent open = new Intent(context, MainActivity.class)
                     .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP)
@@ -234,10 +231,77 @@ final class HomeWidgetRenderer {
                     views.setRemoteAdapter(R.id.widget_event_rows, adapter);
                 }
             }
-            views.setOnClickPendingIntent(todo ? R.id.widget_root : R.id.widget_title, pending);
+            views.setOnClickPendingIntent(R.id.widget_title, pending);
             manager.updateAppWidget(id, views);
-            if (!todo && android.os.Build.VERSION.SDK_INT < 31) manager.notifyAppWidgetViewDataChanged(id, R.id.widget_event_rows);
+            if (android.os.Build.VERSION.SDK_INT < 31) {
+                manager.notifyAppWidgetViewDataChanged(id, todo ? R.id.widget_todo_rows : R.id.widget_event_rows);
+            }
         }
+    }
+
+    private static void bindTodo(Context context, RemoteViews views, int id) {
+        Intent add = new Intent(context, TodoAddActivity.class)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                .setData(Uri.parse("lifetempo://todo-add/" + id))
+                .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id);
+        views.setOnClickPendingIntent(R.id.widget_todo_add, PendingIntent.getActivity(context, id, add,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
+        Intent template = new Intent(context, TodoWidgetActionActivity.class)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION)
+                .setData(Uri.parse("lifetempo://todo-action/" + id));
+        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (android.os.Build.VERSION.SDK_INT >= 31) flags |= PendingIntent.FLAG_MUTABLE;
+        views.setPendingIntentTemplate(R.id.widget_todo_rows, PendingIntent.getActivity(context, id, template, flags));
+        if (android.os.Build.VERSION.SDK_INT >= 31) {
+            RemoteViews.RemoteCollectionItems.Builder items = new RemoteViews.RemoteCollectionItems.Builder()
+                    .setViewTypeCount(1);
+            List<JSONObject> rows = todoRows(context);
+            for (int i = 0; i < rows.size(); i++) items.addItem(i, todoRow(context, rows.get(i)));
+            views.setRemoteAdapter(R.id.widget_todo_rows, items.build());
+        } else {
+            Intent adapter = new Intent(context, TodoWidgetService.class)
+                    .setData(Uri.parse("lifetempo://todo-adapter/" + id))
+                    .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id);
+            views.setRemoteAdapter(R.id.widget_todo_rows, adapter);
+        }
+    }
+
+    static List<JSONObject> todoRows(Context context) {
+        List<JSONObject> result = new ArrayList<>();
+        try {
+            JSONArray rows = new JSONArray(WidgetDataStore.tasks(context));
+            for (int i = 0; i < rows.length(); i++) {
+                JSONObject task = rows.optJSONObject(i);
+                if (task == null || task.optBoolean("done", false)) continue;
+                if (task.optString("id").isEmpty() || task.optString("title").trim().isEmpty()) continue;
+                result.add(task);
+            }
+        } catch (Exception ignored) {}
+        if (result.isEmpty()) {
+            JSONObject empty = new JSONObject();
+            try { empty.put("title", "目前沒有待辦事項"); } catch (Exception ignored) {}
+            result.add(empty);
+        }
+        return result;
+    }
+
+    static RemoteViews todoRow(Context context, JSONObject task) {
+        RemoteViews row = new RemoteViews(context.getPackageName(), R.layout.widget_todo_row);
+        String id = task.optString("id");
+        boolean real = !id.isEmpty();
+        String title = task.optString("title").trim();
+        if (real && task.optBoolean("widgetPlan", false)) title = "◷ " + title;
+        String due = task.optString("due");
+        row.setTextViewText(R.id.widget_todo_text, title);
+        row.setTextViewText(R.id.widget_todo_due, real && due.length() >= 10 ? due.substring(5, 10) : "");
+        row.setViewVisibility(R.id.widget_todo_due, real && due.length() >= 10 ? android.view.View.VISIBLE : android.view.View.GONE);
+        row.setViewVisibility(R.id.widget_todo_check, real ? android.view.View.VISIBLE : android.view.View.GONE);
+        if (real) {
+            row.setOnClickFillInIntent(R.id.widget_todo_check,
+                    new Intent().putExtra("todoAction", "toggle").putExtra("todoId", id));
+        }
+        row.setOnClickFillInIntent(R.id.widget_todo_body, new Intent().putExtra("todoAction", "open"));
+        return row;
     }
 
     static List<JSONObject> upcomingEvents(Context context, int widgetId) {
