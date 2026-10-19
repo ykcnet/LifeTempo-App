@@ -111,6 +111,19 @@ test('switching Google accounts uses an independent sync baseline',async()=>{
   remote.account='account2';remote.files.splice(0);await a.connect();
   assert.ok(a.storage.has('lifetempo.drive.base.account1'));assert.ok(a.storage.has('lifetempo.drive.base.account2'));
 });
+test('Android authorization bridge supplies a short-lived token to the shared Drive sync flow',async()=>{
+  const remote=drive(),a=client(remote,state(['phone']));let usedNativeBridge=false;
+  a.context.LifeTempoWidget={};
+  a.context.LifeTempoDriveNative={authorize:requestId=>{
+    usedNativeBridge=true;a.api.completeNativeAuthorization(requestId,'TEST','');
+  }};
+  await a.api.connect();
+  assert.equal(usedNativeBridge,true);
+  assert.equal(remote.files.length,1);
+  assert.equal(remote.files[0].content.events[0].title,'phone');
+  assert.equal(a.api.getState().account,'account1@example.com');
+  assert.ok(![...a.storage.values()].join('').includes('TEST'));
+});
 test('server sync blocks Google connection and leaves the local state intact',async()=>{
   const remote=drive(),a=client(remote,state(['one']));a.context.LifeTempoCalendarSync={getState:()=>({connected:true})};
   await a.connect();assert.equal(remote.files.length,0);assert.match(a.api.getState().status,/伺服器/);
