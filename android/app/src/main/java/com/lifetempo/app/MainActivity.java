@@ -99,8 +99,12 @@ public final class MainActivity extends Activity {
     }
 
     private void loadApp(Intent intent) {
-        String widget = intent == null ? null : intent.getStringExtra("widget");
-        webView.loadUrl(APP_ORIGIN + "index.html" + (widget == null ? "" : "?widget=" + Uri.encode(widget)));
+        String widget = intent == null ? null : intent.getStringExtra("widgetView");
+        if (widget == null && intent != null) widget = intent.getStringExtra("widget");
+        String date = intent == null ? null : intent.getStringExtra("widgetDate");
+        String query = widget == null ? "" : "?widget=" + Uri.encode(widget);
+        if (date != null && date.matches("\\d{4}-\\d{2}-\\d{2}")) query += (query.isEmpty() ? "?" : "&") + "date=" + Uri.encode(date);
+        webView.loadUrl(APP_ORIGIN + "index.html" + query);
     }
 
     private final class ExportBridge {

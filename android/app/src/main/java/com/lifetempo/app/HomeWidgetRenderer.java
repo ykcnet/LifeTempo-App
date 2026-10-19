@@ -6,9 +6,17 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
+import android.graphics.Typeface;
 import android.net.Uri;
+import android.text.SpannableString;
+import android.text.SpannableStringBuilder;
+import android.text.Spanned;
+import android.text.style.StyleSpan;
 import android.os.Bundle;
 import android.widget.RemoteViews;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import java.time.LocalDate;
@@ -168,17 +176,86 @@ final class HomeWidgetRenderer {
             int height = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 100);
             int rowLimit = Math.max(1, Math.min(8, (height - 50) / 27));
             RemoteViews views = new RemoteViews(context.getPackageName(), todo ? R.layout.widget_todo : R.layout.widget_today);
-            views.setTextViewText(R.id.widget_title, todo ? "待辦事項" : "今日行程");
-            views.setTextViewText(R.id.widget_content, content(json, todo, rowLimit));
+            views.setTextViewText(R.id.widget_title, todo ? "待辦事項" : "近日行程");
+            if (todo) views.setTextViewText(R.id.widget_content, content(json, true, rowLimit));
+            else renderUpcoming(context, views, json, id, rowLimit);
 
             Intent open = new Intent(context, MainActivity.class)
                     .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                    .putExtra("widget", todo ? "todo" : "today");
+                    .putExtra("widget", todo ? "todo" : "today")
+                                        .putExtra("widgetView", todo ? "todo" : "upcoming");
+            if (!todo) {
+                List<JSONObject> nearest = upcoming(json, 1);
+                if (!nearest.isEmpty()) open.putExtra("widgetDate", nearest.get(0).optString("date", ""));
+            }
             PendingIntent pending = PendingIntent.getActivity(context, todo ? 2 : 1, open,
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
             views.setOnClickPendingIntent(R.id.widget_root, pending);
+            if (!todo) {
+                Intent settings = new Intent(context, TodayEventsWidgetProvider.class).setAction(TodayEventsWidgetProvider.ACTION_SETTINGS)
+                        .setData(Uri.parse("lifetempo://upcoming/settings/" + id))
+                        .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id);
+                PendingIntent settingsPending = PendingIntent.getBroadcast(context, id + 1000, settings,
+                        PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+                views.setOnClickPendingIntent(R.id.widget_settings, settingsPending);
+            }
             manager.updateAppWidget(id, views);
         }
+    }
+
+    private static void renderUpcoming(Context context, RemoteViews views, String json, int id, int rowLimit) {
+        boolean divider = context.getSharedPreferences("lifetempo_widgets", Context.MODE_PRIVATE).getBoolean("upcomingDivider." + id, true);
+        int limit = Math.max(1, Math.min(8, context.getSharedPreferences("lifetempo_widgets", Context.MODE_PRIVATE).getInt("upcomingCount." + id, 4)));
+        List<JSONObject> items = upcoming(json, limit);
+        if (items.isEmpty()) {
+            views.setTextViewText(R.id.widget_content, "近期沒有行程");
+            return;
+        }
+        int visibleLimit = Math.max(1, Math.min(items.size(), rowLimit));
+        SpannableStringBuilder content = new SpannableStringBuilder();
+        for (int i = 0; i < visibleLimit; i++) {
+            if (i > 0) content.append(divider ? "\n────────\n" : "\n\n");
+            content.append(upcomingLabel(items.get(i)));
+        }
+        views.setTextViewText(R.id.widget_content, content);
+    }
+
+    private static List<JSONObject> upcoming(String json, int limit) {
+        List<JSONObject> visible = new ArrayList<>();
+        try {
+            JSONArray rows = new JSONArray(json);
+            LocalDate today = LocalDate.now();
+            for (int i = 0; i < rows.length(); i++) {
+                JSONObject item = rows.optJSONObject(i);
+                if (item == null || item.optString("title", "").trim().isEmpty()) continue;
+                String date = item.optString("date", "");
+                if (!date.matches("\\d{4}-\\d{2}-\\d{2}") || LocalDate.parse(date).isBefore(today)) continue;
+                visible.add(item);
+            }
+            visible.sort(Comparator.comparing(item -> item.optString("date") + "T" + item.optString("start")));
+        } catch (Exception ignored) {}
+        return visible.subList(0, Math.min(limit, visible.size()));
+    }
+
+    private static CharSequence upcomingLabel(JSONObject item) {
+        String date = item.optString("date", "");
+        String when = item.optBoolean("allDay", false) ? "全天" : widgetTime(item);
+        String prefix = date.length() >= 10 ? date.substring(5) + " " + when : when;
+        String text = prefix + "  " + item.optString("title", "").trim();
+        SpannableString styled = new SpannableString(text);
+        styled.setSpan(new StyleSpan(Typeface.BOLD), 0, prefix.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        return styled;
+    }
+
+    private static String widgetTime(JSONObject item) {
+        String start = item.optString("start", "");
+        if (!start.matches("\\d{2}:\\d{2}")) return start;
+        try {
+            ZoneId zone = ZoneId.of(item.optString("timezone", ZoneId.systemDefault().getId()));
+            LocalTime time = LocalDate.parse(item.optString("date")).atTime(LocalTime.parse(start)).atZone(zone)
+                    .withZoneSameInstant(ZoneId.systemDefault()).toLocalTime();
+            return time.format(DateTimeFormatter.ofPattern("HH:mm"));
+        } catch (Exception ignored) { return start; }
     }
 
     private static String content(String json, boolean todo, int limit) {
