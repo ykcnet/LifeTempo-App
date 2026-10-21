@@ -6,6 +6,10 @@
 .day-head strong{font-size:1.375rem;width:34px;height:34px;line-height:34px}
 .month-day .lunar,.day-head .lunar{font-size:.8125rem;font-weight:400}
 .agenda-date{font-size:1.125rem}
+.workspace-calendar .day-head strong{font-size:1.25rem!important}
+.workspace-calendar .day-head .lunar{font-size:.6875rem!important}
+.agenda-date{font-size:1rem!important}
+.agenda-date small{font-size:.8125rem}
 .import-steps{display:flex;flex-wrap:wrap;gap:8px;list-style:none;padding:0;font-size:.875rem;color:var(--muted)}
 .import-steps li{padding:5px 9px;border:1px solid var(--line);border-radius:8px}
 .import-steps [aria-current=step]{background:var(--purple);color:white;font-weight:600}
@@ -116,7 +120,7 @@ body.dark .agenda-category{background:#20252d!important}
 .card:has(>.month-grid),.card:has(>.weekdays+.month-grid){width:100vw;margin-left:calc(50% - 50vw);margin-right:0;border-radius:0;border-left:0;border-right:0}
 .month-grid .month-cell{min-height:84px;padding:3px 2px;border-color:#e6e9ef;overflow:hidden}
 .month-cell .month-day{align-items:center;gap:0;font-size:.9375rem}
-.month-cell .month-day-number{width:22px;height:22px;font-size:.875rem}
+.month-cell .month-day-number{width:22px;height:22px;font-size:1rem;font-weight:700}
 .month-cell .month-day .lunar{font-size:.5625rem;color:var(--muted)}
 .month-cell .local-badges{gap:1px;margin-top:1px;justify-content:center}
 .month-cell .local-badge{font-size:.5625rem;padding:0 3px;line-height:1.3}

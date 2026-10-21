@@ -1,3 +1,13 @@
 {
-    "java.configuration.updateBuildConfiguration": "interactive"
+    "java.configuration.updateBuildConfiguration": "interactive",
+    "chat.tools.terminal.autoApprove": {
+        "/^node --test --test-isolation=none ai-plan\\.test\\.mjs ai-browser\\.test\\.mjs$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^node build-ai-client\\.mjs; if \\(\\$\\?\\) \\{ node --test --test-isolation=none ai-plan\\.test\\.mjs ai-browser\\.test\\.mjs \\}$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
 }

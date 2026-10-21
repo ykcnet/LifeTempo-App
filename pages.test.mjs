@@ -27,6 +27,12 @@ test('mobile keeps the AI planner entry and calendar navigation controls',()=>{
   assert.match(html,/id="next"/);
 });
 
+test('desktop hides bottom navigation while phone navigation remains fixed',()=>{
+  const html=read('index.html');
+  assert.match(html,/@media\(min-width:651px\)\{\s*\.bottom-nav\{display:none!important\}\s*\.app\{padding-bottom:0\}\s*\}/);
+  assert.match(html,/@media\(max-width:650px\)\{[\s\S]*?\.bottom-nav\{position:fixed;bottom:0/);
+});
+
 test('phone AI button imports a desktop plan while desktop keeps its AI planner',()=>{
   const html=read('index.html'),enhancements=read('enhancements.js');
   assert.match(html,/if\(\$\('#aiPlanBtn'\)\)\$\('#aiPlanBtn'\)\.onclick=openAIPlan/);
@@ -93,6 +99,16 @@ test('calendar agenda shows category labels and clear today markers',()=>{
   assert.match(read('enhancements.js'),/month-cell\[data-day=/);
   assert.match(read('localization.css'),/\.day-head\.is-today strong/);
   assert.match(read('localization.css'),/\.month-cell\.is-today \.month-day-number/);
+});
+
+test('Gregorian dates are larger than lunar labels in calendar and agenda views',()=>{
+  const styles=read('localization.css');
+  assert.match(styles,/\.workspace-calendar \.day-head strong\{font-size:1\.25rem!important\}/);
+  assert.match(styles,/\.workspace-calendar \.day-head \.lunar\{font-size:\.6875rem!important\}/);
+  assert.match(styles,/\.month-cell \.month-day-number\{[^}]*font-size:1rem;font-weight:700/);
+  assert.match(styles,/\.month-cell \.month-day \.lunar\{font-size:\.5625rem/);
+  assert.match(styles,/\.agenda-date\{font-size:1rem!important\}/);
+  assert.match(styles,/\.agenda-date small\{font-size:\.8125rem\}/);
 });
 
 test('mobile month date badge and fixed navigation are restricted to phone widths',()=>{

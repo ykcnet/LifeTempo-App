@@ -94,14 +94,16 @@ test('travel fallback uses sightseeing rather than work and respects busy slots'
   assert.ok(plan.events.every(e=>!/工作|文書|會議/.test(e.title)));
   assert.ok(plan.events.every(e=>e.date!=='2026-10-10'||e.end<='09:00'||e.start>='10:00'));
 });
-test('travel AI instruction includes travel routing and omits generic work hours',async()=>{
+test('travel AI instruction includes routing, multi-day overnight stays and omits generic work hours',async()=>{
   let instruction='';
   const ctx=vm.createContext({callLLM:async prompt=>{instruction=prompt;return {error:'test only'}}});
   vm.runInContext(planner,ctx);
   vm.runInContext(server.slice(server.indexOf('async function generatePlan'),server.indexOf('const port =')),ctx);
-  await ctx.generatePlan({prompt:'安排台南自由行',category:'旅遊'});
+  await ctx.generatePlan({prompt:'安排台南三天兩夜自由行',category:'旅遊',startDate:'2026-10-24',endDate:'2026-10-26'});
   assert.match(instruction,/順路動線/);
   assert.match(instruction,/除非使用者明確要求工作或會議/);
+  assert.match(instruction,/預設在目的地住宿/);
+  assert.match(instruction,/中間日期留在目的地附近活動與住宿/);
   assert.doesNotMatch(instruction,/工作時間建議 09:00-18:00/);
 });
 test('generic travel responses are rejected while specific recommendations are accepted',async()=>{
@@ -197,11 +199,31 @@ test('AI keeps minute precision, overnight end date and planning timezone',async
   assert.equal(result.events[0].endDate,'2026-10-25');
   assert.equal(result.events[0].timezone,'Asia/Tokyo');
 });
+test('AI infers next-day end date for overnight return events when the model omits it',async()=>{
+  const result=await planWith([{...timedEvent,title:'回到基隆',date:'2026-10-25',start:'20:30',end:'01:10'}],'台南旅遊，10月24日至26日往返搭乘高鐵',{startDate:'2026-10-24',endDate:'2026-10-26'});
+  assert.equal(result.error,undefined);
+  assert.equal(result.events[0].endDate,'2026-10-26');
+});
 test('invalid clock values and reversed ranges reject the plan',async()=>{
   for(const patch of [{start:'25:00'},{end:'10:99'},{end:'08:00'},{date:'2026-02-30'}]) {
     const result=await planWith([{...timedEvent,...patch}]);
     assert.ok(result.error);assert.equal(result.events.length,0);
   }
+});
+test('AI retries a zero-duration event and retains the corrected itinerary',async()=>{
+  const prompts=[];
+  const results=[
+    {content:JSON.stringify({events:[{...timedEvent,title:'高速列車到基隆',start:'19:00',end:'19:00'}]})},
+    {content:JSON.stringify({events:[{...timedEvent,title:'高速列車到基隆',start:'19:00',end:'21:00'}]})}
+  ];
+  const ctx=vm.createContext({callLLM:async prompt=>{prompts.push(prompt);return results.shift();}});
+  vm.runInContext(planner,ctx);
+  vm.runInContext(server.slice(server.indexOf('async function generatePlan'),server.indexOf('const port =')),ctx);
+  const result=await ctx.generatePlan({prompt:'台南旅遊，最後一天搭高鐵回基隆',startDate:'2026-10-24',endDate:'2026-10-26'});
+  assert.equal(prompts.length,2);
+  assert.match(prompts[1],/結束時間必須晚於開始時間/);
+  assert.equal(result.error,undefined);
+  assert.equal(result.events[0].end,'21:00');
 });
 test('AI rejects events outside the requested date range',async()=>{
   const result=await planWith([{...timedEvent,date:'2026-10-25'}],'安排活動',{startDate:'2026-10-24',endDate:'2026-10-24'});

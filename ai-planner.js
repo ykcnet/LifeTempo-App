@@ -27,8 +27,13 @@ function parseResponse(value) {
 }
 async function generatePlan(body, callLLM) {
   const first = await generatePlanOnce(body, callLLM);
-  if (!/時間重疊，請重新規劃/.test(first.error || '')) return first;
-  const retry = await generatePlanOnce({...body, prompt:`${body.prompt || body.description || ''}\n\n【上一次回覆被退回】${first.error}\n請重新安排，每筆行程之間至少間隔 30 分鐘，且絕對不得有任何時間重疊。`}, callLLM);
+  const overlap=/時間重疊，請重新規劃/.test(first.error||'');
+  const invalidDuration=/結束時間必須晚於開始/.test(first.error||'');
+  if(!overlap&&!invalidDuration) return first;
+  const correction=overlap
+    ? '請重新安排，每筆行程之間至少間隔 30 分鐘，且絕對不得有任何時間重疊。'
+    : '請重新規劃該筆行程，結束時間必須晚於開始時間，確保每筆行程都有合理且大於零的時長；保留已指定的開始時間，不要把開始與結束設為相同時間。跨午夜時請設定正確的次日結束日期。';
+  const retry = await generatePlanOnce({...body, prompt:`${body.prompt || body.description || ''}\n\n【上一次回覆被退回】${first.error}\n${correction}`}, callLLM);
   return retry.error ? first : retry;
 }
 async function generatePlanOnce(body, callLLM) {
@@ -41,6 +46,7 @@ async function generatePlanOnce(body, callLLM) {
   const endDate = body.endDate || '';
   const location = body.location || '';
   const category = body.category || '';
+  const multiDayTravel=(category==='旅遊'||/旅遊|旅行|觀光|度假|自由行|自助行|景點|兩天一夜|三天兩夜/.test(prompt))&&startDate&&endDate&&endDate>startDate;
   const timezone = body.timezone || 'Asia/Taipei';
   const busyEvents = Array.isArray(body.existingEvents) ? body.existingEvents.slice(0, 100) : [];
   const prefProvider = body.provider || '';
@@ -71,14 +77,15 @@ async function generatePlanOnce(body, callLLM) {
 3. 日期範圍：${startDate || '未指定起始'} ~ ${endDate || '未指定結束'}
 4. 地點偏好：${location || '未指定'}
 5. 主題偏好：${category || '未指定'}
-6. ${category==='旅遊' || /旅遊|旅行|觀光|度假|自由行|自助行|景點|兩天一夜|三天兩夜/.test(prompt) ? '這是旅遊需求：以目的地、景點、在地美食、交通、住宿與休息安排為主。除非使用者明確要求工作或會議，不得加入重點工作、文書處理、回信或會議。依地理位置安排順路動線，首日考慮抵達、末日考慮返程。無法確認的營業時間、票價、班次須註明待確認，不得捏造。' : '依使用者的活動性質安排時段，只有工作需求才建議 09:00-18:00 工作；其他主題不要套用工作行程。'}
+6. ${category==='旅遊' || /旅遊|旅行|觀光|度假|自由行|自助行|景點|兩天一夜|三天兩夜/.test(prompt) ? `這是旅遊需求：以目的地、景點、在地美食、交通、住宿與休息安排為主。除非使用者明確要求工作或會議，不得加入重點工作、文書處理、回信或會議。依地理位置安排順路動線。${multiDayTravel?'多日旅遊預設在目的地住宿：只在第一天安排一次前往目的地的去程，只在最後一天安排一次返回出發地的返程；中間日期留在目的地附近活動與住宿，不可每天往返出發地或重複安排去回程。只有使用者明確要求每天往返時才例外。':''}首日考慮抵達、末日考慮返程。無法確認的營業時間、票價、班次須註明待確認，不得捏造。` : '依使用者的活動性質安排時段，只有工作需求才建議 09:00-18:00 工作；其他主題不要套用工作行程。'}
 7. 三餐時間合理安排，不要從早排到晚不留空檔
 8. 每天 3-8 個行程為宜
 9. 產出可執行的建議，不要回傳待填寫的通用範本。旅遊活動必須寫出實際景點、街區或場所名稱，例如標題應是「參觀赤崁樓」，而非「上午景點遊覽」。place 寫實際場所名稱與所在城市，notes 說明推薦原因、建議活動及交通方式。餐廳不確定時可建議具名商圈或美食街；不得捏造店名、地址、營業時間或交通班次。
 10. 使用者已指定的景點、餐廳、偏好和限制應反映在安排中；不同日期不要重複同一組通用行程。資訊不足而無法提出具體建議時，回傳 error 說明需要補充的資料，events 留空。
-11. 所有日期與時間以 ${timezone} 時區表達，保留使用者指定的精確分鐘與活動時長，不得任意取整或移動固定時段。結束必須晚於開始，跨日須明確填 endDate；缺少固定時間時才提出建議時段。
+11. 所有日期與時間以 ${timezone} 時區表達，保留使用者指定的精確分鐘與活動時長，不得任意取整或移動固定時段。跨午夜的活動必須設定次日 endDate；若晚間開始、清晨結束且未提供 endDate，規劃器會視為跨午夜。缺少固定時間時才提出建議時段。
 12. 「整天／一整日」且包含上午、下午或晚上的需求，必須拆成各活動的獨立 events，每筆填實際建議起訖時間、allDay=false。不得將一天的活動塞進一筆 09:00–10:00，或把上午下午活動只寫在 notes。只有不指定時段的全天事項才使用 allDay=true。未指定精確時間時，依活動合理估計時長，並在 notes 註明「建議時段」。
 13. 每筆行程的開始日期必須在指定日期範圍內；行程彼此及與忙碌時段都不得重疊，並避免緊接安排而沒有交通或休息緩衝。
+14. 每筆有時間的行程都必須有大於零且合理的活動時長，結束時間不可與開始時間相同。交通行程依合理估計安排起訖時間，不得把出發時間直接當作抵達時間；估計班次或車程須註明待確認。
 
 使用者需求：
 ${prompt}
@@ -130,6 +137,7 @@ ${prompt}
       if(e.end==='24:00'&&validPlanDate(endDate)){endDate=nextDate(endDate);e.end='00:00';}
       if(!timeRe.test(e.start)) return invalid('開始時間',raw.start);
       if(!timeRe.test(e.end)) return invalid('結束時間',raw.end);
+      if(!e.allDay&&!clean(e.endDate)&&e.end<e.start&&Number(e.start.slice(0,2))>=18&&Number(e.end.slice(0,2))<6) endDate=nextDate(e.date);
       if(!validPlanDate(endDate)) return invalid('結束日期',raw.endDate);
       if(e.allDay?endDate<=e.date:endDate+'T'+e.end<=e.date+'T'+e.start) return {error:`AI 第 ${index+1} 筆行程「${clean(e.title).slice(0,60)}」結束時間必須晚於開始（${e.date} ${e.start} → ${endDate} ${e.end}）；跨日行程需提供結束日期，請重新規劃。`,events:[]};
       events.push({

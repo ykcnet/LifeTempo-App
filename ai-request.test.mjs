@@ -17,6 +17,13 @@ test('spoken duration uses selected start and travel category',()=>{
   assert.equal(result.location,'台南');
   assert.equal(result.category,'旅遊');
 });
+test('travel destination takes precedence over the user’s home city',()=>{
+  const result=AIRequest.parse('家住基隆，規劃這週六到下週一台南三天兩夜旅遊，往返搭乘高鐵',new Date(2026,9,20));
+  assert.equal(result.startDate,'2026-10-24');
+  assert.equal(result.endDate,'2026-10-26');
+  assert.equal(result.location,'台南');
+  assert.equal(result.category,'旅遊');
+});
 test('relative dates and specific venues are linked',()=>{
   const result=parse('明天在體育場慢跑');
   assert.equal(result.startDate,'2026-10-10');

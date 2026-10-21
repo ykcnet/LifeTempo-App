@@ -39,12 +39,16 @@
       const n=/^\d+$/.test(duration[1])?+duration[1]:({'一':1,'二':2,'兩':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10}[duration[1]]);
       if(n&&n<=366) result.endDate=stamp(shift(dates[0]||new Date(fallbackStart+'T00:00:00'),n-1));
     }
-    const place=text.match(/(?:地點[：:]|在|前往|去)\s*([^，,。；;\n]+?)(?=安排|進行|開會|會議|討論|旅行|旅遊|出差|玩|吃飯|健身|慢跑|散步|看診|$)/);
-    const city=text.match(/台北|新北|桃園|台中|台南|高雄|基隆|新竹|苗栗|彰化|南投|雲林|嘉義|屏東|宜蘭|花蓮|台東|澎湖|金門|連江|東京|大阪|京都|首爾|香港/);
-    if(place&&place[1].trim().length<=30) result.location=place[1].trim();
-    else if(city) result.location=city[0];
     const categories=[['旅遊',/旅遊|旅行|觀光|景點|度假|自由行|自助行|兩天一夜|三天兩夜/],['工作',/工作|出差|客戶|會議|開會/],['健康',/運動|健身|慢跑|看診|就醫/],['家庭',/家庭|家人|親子/],['個人',/個人|購物|買東西/]];
     result.category=categories.find(([,re])=>re.test(text))?.[0];
+    const place=text.match(/(?:地點[：:]|在|前往|去)\s*([^，,。；;\n]+?)(?=安排|進行|開會|會議|討論|旅行|旅遊|出差|玩|吃飯|健身|慢跑|散步|看診|$)/);
+    const cities=[...text.matchAll(/台北|新北|桃園|台中|台南|高雄|基隆|新竹|苗栗|彰化|南投|雲林|嘉義|屏東|宜蘭|花蓮|台東|澎湖|金門|連江|東京|大阪|京都|首爾|香港/g)];
+    const travelCity=result.category==='旅遊'
+      ? cities.find(city=>!/(?:家住|(?:我家|家)?住在|居住在|居住於|家在|從|自|回到|回程(?:到)?|返程(?:到)?|返家(?:到)?|回\s*$)/.test(text.slice(Math.max(0,city.index-10),city.index)))
+      : null;
+    if(travelCity) result.location=travelCity[0];
+    else if(place&&place[1].trim().length<=30) result.location=place[1].trim();
+    else if(cities.length) result.location=cities[0][0];
     return result;
   }
   globalThis.AIRequest={parse};

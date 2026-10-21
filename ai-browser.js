@@ -1,5 +1,6 @@
 (function () {
   const textField={type:'string',maxLength:80};
+  const fallbackPromptTimeoutMs=60000;
   const schema={type:'object',properties:{
     summary:textField,error:textField,events:{type:'array',items:{type:'object',properties:{
       title:{type:'string',minLength:1,maxLength:80},
@@ -67,13 +68,29 @@
           requestData.category={工作:'work',個人:'personal',家庭:'family',健康:'health',旅遊:'travel',其他:'other'}[body.category]||'';
         }
         const rules=translate
-          ? 'Plan ONLY the target date in this trip, in English. Return concise JSON: title,date,start,end; place/category if useful. Omit summary/notes unless necessary. endDate only for overnight events; allDay only for truly untimed events (exclusive endDate). Preserve requested times, split morning/afternoon, avoid overlaps, allow travel/rest. Use specific nearby places, avoid repeating earlier days. Include outbound transport on first day and return on last day as requested. Never invent train numbers or verified schedules; mark estimates. Only return events:[] with a specific error when essential details such as destination or dates are missing. If details are sufficient, create the itinerary; unverified schedules or opening hours are not a reason to return an error.'
-          : '只規劃指定日期，輸出繁體中文 JSON：title,date,start,end，必要時才加 place/category。省略長摘要及備註。同日不用 endDate；跨日須填。真正無時段的全天事項才用 allDay，endDate 不含最後一天。保留指定時間，上午下午分開，避開重疊並預留交通休息。旅遊選具體且順路的地點，勿重複前日活動，依需求首日去程、末日回程。不得捏造班次，建議時間需註明待確認。僅在缺少目的地或日期等必要資訊、確實無法安排時才回傳 events:[] 與具體 error；資訊足夠時必須提出行程，不可只因班次、營業時間或票價未確認而回傳 error。';
+          ? 'Plan ONLY the target date in this trip, in English. Return concise JSON: title,date,start,end; place/category if useful. Omit summary/notes unless necessary. Every timed event must have a positive, realistic duration; end must be later than start. Never use identical start and end times. Estimate a positive duration for transport and mark schedules as unverified. endDate only for overnight events; allDay only for truly untimed events (exclusive endDate). For an evening event ending before 06:00, set endDate to the next day. Preserve requested times, split morning/afternoon, avoid overlaps, allow travel/rest. Use specific nearby places, avoid repeating earlier days. Include outbound transport on first day and return on last day as requested. Never invent train numbers or verified schedules; mark estimates. Only return events:[] with a specific error when essential details such as destination or dates are missing. If details are sufficient, create the itinerary; unverified schedules or opening hours are not a reason to return an error.'
+          : '只規劃指定日期，輸出繁體中文 JSON：title,date,start,end，必要時才加 place/category。省略長摘要及備註。同日不用 endDate；跨日須填。每筆有時間的行程必須安排大於零且合理的時長，結束時間必須晚於開始時間，不可使用相同的開始與結束時間。交通行程需估計合理車程，班次及估計時間註明待確認。晚間開始且清晨（06:00 前）結束的行程，endDate 填次日。真正無時段的全天事項才用 allDay，endDate 不含最後一天。保留指定時間，上午下午分開，避開重疊並預留交通休息。旅遊選具體且順路的地點，勿重複前日活動，依需求首日去程、末日回程。不得捏造班次，建議時間需註明待確認。僅在缺少目的地或日期等必要資訊、確實無法安排時才回傳 events:[] 與具體 error；資訊足夠時必須提出行程，不可只因班次、營業時間或票價未確認而回傳 error。';
         const days=[];
         const validDate=value=>/^\d{4}-\d{2}-\d{2}$/.test(value||'')&&Number.isFinite(Date.parse(value+'T00:00Z'))&&new Date(value+'T00:00Z').toISOString().slice(0,10)===value;
+        const incompleteModelError=value=>/^(?:\d{4}-\d{2}-\d{2}\s*)?(?:(?:開始日期|結束日期|日期|開始時間|結束時間|時間|地點|行程|events|error)\s*){1,3}$/i.test(value);
         if(validDate(body.startDate)&&validDate(body.endDate)&&body.endDate>=body.startDate) {
           for(let stamp=Date.parse(body.startDate+'T00:00Z');stamp<=Date.parse(body.endDate+'T00:00Z');stamp+=86400000)days.push(new Date(stamp).toISOString().slice(0,10));
         } else days.push(null);
+        const multiDayTravel=days.length>1&&(requestData.category==='旅遊'||requestData.category==='travel'||/旅遊|旅行|觀光|度假|自由行|自助行|景點|兩天一夜|三天兩夜|\btravel\b|\btrip\b/i.test(requestData.request));
+        const dailyRoundTrip=/每天|每日|天天|當天來回|每日往返|天天往返/.test(requestData.request);
+        const cityNames=[...requestData.request.matchAll(/台北|新北|桃園|台中|台南|高雄|基隆|新竹|苗栗|彰化|南投|雲林|嘉義|屏東|宜蘭|花蓮|台東|澎湖|金門|連江|東京|大阪|京都|首爾|香港/g)];
+        const origin=cityNames.map(city=>city[0]).find(city=>city!==requestData.location&&!requestData.location.includes(city))||'';
+        const invalidMiddleDay=events=>multiDayTravel&&!dailyRoundTrip&&days.length>2&&events.some(event=>{
+          const text=[event?.title,event?.place,event?.notes].filter(Boolean).join(' ');
+          const intercity=/高鐵|高鐵站|台鐵|火車|長途客運|航班|機場|城際/;
+          const movement=/搭|出發|前往|返回|回程|返程|回到|回家|返家|離開|往返/;
+          return intercity.test(text)&&movement.test(text)&&(origin&&text.includes(origin)||/返程|回程|返回|回到|回家|返家|離開/.test(text));
+        });
+        const dayTravelRule=multiDayTravel
+          ? translate
+            ? 'MULTI-DAY TRIP RULE: Assume overnight stays at the destination. Schedule exactly one outbound intercity trip on day 1 and exactly one return-to-origin trip on the final day. On every middle day stay near the destination; do not travel back to the origin or repeat outbound/return intercity journeys. Only plan daily round trips if the user explicitly requests them.'
+            : '【多日旅遊住宿規則】預設夜宿目的地。只在第一天安排一次前往目的地的去程，只在最後一天安排一次返回出發地的返程。中間日期留在目的地附近活動與住宿，不得返回出發地、每天往返或重複去回程。只有使用者明確要求每天往返時才例外。'
+          : '';
         const parsed={events:[]};
         let content='',targetDate=null;
         const generationStarted=Date.now();
@@ -89,29 +106,61 @@
             }
             const progress=()=>report(`正在規劃第 ${index+1}/${days.length} 天${date?'（'+date+'）':''}，生成已用 ${Math.round((Date.now()-generationStarted)/1000)} 秒，已收到 ${content.length} 字元…`);
             progress();
-            const instruction=rules+'\n'+JSON.stringify({...requestData,targetDate:date,day:index+1,totalDays:days.length,busy:(body.existingEvents||[]).filter(e=>!date||e.date===date)});
+            const retryGuidance=prompt.includes('【上一次回覆被退回】')?prompt.slice(prompt.lastIndexOf('【上一次回覆被退回】')):'';
+            const dayRequest=JSON.stringify({...requestData,targetDate:date,day:index+1,totalDays:days.length,busy:(body.existingEvents||[]).filter(e=>!date||e.date===date)});
             const daySchema=date?{...schema,properties:{...schema.properties,events:{...schema.properties.events,items:{...schema.properties.events.items,properties:{...schema.properties.events.items.properties,date:{type:'string',enum:[date]}}}}}}:schema;
             const promptOptions={responseConstraint:daySchema,signal:signal||undefined};
-            let dayPlan=null;
+            let dayPlan=null,correction='';
             for(let attempt=1;attempt<=3;attempt++) {
               content='';
+              let waitedSeconds=0;
+              const waiting=setInterval(()=>{
+                waitedSeconds+=15;
+                report(`第 ${index+1} 天 AI 仍在生成，已等待 ${waitedSeconds} 秒；若持續沒有回應，可按「停止規劃」。`);
+              },15000);
               try {
+                const dayPosition=multiDayTravel
+                  ? translate
+                    ? `Trip day ${index+1} of ${days.length}: ${index===0?'OUTBOUND DAY — travel from origin to destination once; no return trip today.':index===days.length-1?'FINAL RETURN DAY — return to origin once; do not add a second outbound trip.':'MIDDLE DAY — stay at the destination; no origin-to-destination or destination-to-origin intercity travel.'}`
+                    : `旅程第 ${index+1}/${days.length} 天：${index===0?'去程日：只安排一次從出發地前往目的地，不安排返程。':index===days.length-1?'最後返程日：只安排一次返回出發地，不要重複去程。':'目的地停留日：留在目的地及附近活動，不安排回出發地或城際往返交通。'}`
+                  : '';
+                const instruction=rules+'\n'+dayTravelRule+'\n'+dayPosition+'\n'+retryGuidance+'\n'+correction+'\n'+dayRequest;
                 if(session.promptStreaming) {
                   for await(const chunk of session.promptStreaming(instruction,promptOptions)) {content+=chunk;progress();}
                   if(!content.trim()&&session.prompt) {
                     report(`第 ${index+1} 天串流沒有回應，改用一般生成重試…`);
-                    content=await session.prompt(instruction,promptOptions);
+                    let timeoutId;
+                    const timeoutController=new AbortController();
+                    const fallbackSignal=signal?AbortSignal.any([signal,timeoutController.signal]):timeoutController.signal;
+                    const timeout=new Promise((_,reject)=>{
+                      timeoutId=setTimeout(()=>{
+                        timeoutController.abort();
+                        const error=new Error(`第 ${index+1} 天一般生成超過 ${fallbackPromptTimeoutMs/1000} 秒仍未完成，已停止等待；請重試或改用其他 AI 服務。`);
+                        error.name='FallbackTimeoutError';
+                        reject(error);
+                      },fallbackPromptTimeoutMs);
+                    });
+                    let onCancel;
+                    const cancelled=signal?new Promise((_,reject)=>{
+                      onCancel=()=>reject(signal.reason||new Error('已取消規劃。'));
+                      if(signal.aborted) onCancel();
+                      else signal.addEventListener('abort',onCancel,{once:true});
+                    }):new Promise(()=>{});
+                    try {
+                      content=await Promise.race([session.prompt(instruction,{...promptOptions,signal:fallbackSignal}),timeout,cancelled]);
+                    } finally {
+                      clearTimeout(timeoutId);
+                      if(onCancel) signal.removeEventListener('abort',onCancel);
+                    }
                   }
                 } else content=await session.prompt(instruction,promptOptions);
-                if(!String(content||'').trim()) {
-                  const emptyResponse=new Error('瀏覽器內建 AI 未回傳內容（串流與一般生成皆為空）');
-                  emptyResponse.name='EmptyResponseError';
-                  throw emptyResponse;
-                }
+                if(!String(content||'').trim()) throw new Error('瀏覽器內建 AI 串流與一般生成皆未回傳內容');
                 dayPlan=AIPlanner.parseResponse(content);
                 if(dayPlan.error) {
                   const modelError=String(dayPlan.error).trim();
-                  if(/^(?:事件|行程|錯誤|error)\s*[：:]?\s*$/i.test(modelError)&&attempt<3) {
+                  const incomplete=/^(?:事件|行程|錯誤|error)\s*[：:]?\s*$/i.test(modelError)||incompleteModelError(modelError);
+                  if(incomplete&&attempt<3) {
+                    correction=`【第 ${index+1} 天重試】上次回覆的錯誤訊息「${modelError}」不完整，不能只回傳日期或欄位名稱。請根據原需求直接產生 ${date||'指定日期'} 的完整具體行程；若確實無法安排，請用完整句子說明缺少的必要資訊。`;
                     report(`第 ${index+1} 天的 AI 錯誤說明不完整，正在重試（${attempt+1}/3）…`);
                     dayPlan=null;
                     continue;
@@ -120,10 +169,22 @@
                   break;
                 }
                 if(!dayPlan.events?.length||dayPlan.events.some(e=>!e||date&&e.date!==date)) throw new Error('AI 未完整回傳指定日期的行程');
+                if(index>0&&index<days.length-1&&invalidMiddleDay(dayPlan.events)) {
+                  if(attempt<3) {
+                    correction='【中間日行程不符合多日旅遊規劃】上次安排了離開目的地的長途交通。請刪除高鐵、火車、航班或返回出發地的行程，只安排目的地及附近景點、餐飲、休息；多日旅遊中間日預設在目的地住宿。';
+                    report(`第 ${index+1} 天包含離開目的地的長途交通，正在重排行程（${attempt+1}/3）…`);
+                    dayPlan=null;
+                    continue;
+                  }
+                  dayPlan={events:[],error:`第 ${index+1} 天仍包含離開目的地的長途交通，無法確認此安排符合多日旅遊住宿需求；請重新規劃。`};
+                  break;
+                }
                 break;
               } catch(attemptError) {
-                if(signal?.aborted||attempt===3||attemptError.name==='EmptyResponseError') throw attemptError;
+                if(signal?.aborted||attempt===3||attemptError.name==='FallbackTimeoutError') throw attemptError;
                 report(`第 ${index+1} 天回應不完整，正在重試（${attempt+1}/3）…`);
+              } finally {
+                clearInterval(waiting);
               }
             }
             if(dayPlan.error) {parsed.error=dayPlan.error;parsed.events=[];break;}
@@ -133,6 +194,7 @@
         } catch(error) {
           if(signal?.aborted) throw new Error('已取消規劃，未加入任何行程。');
           BrowserAI.lastFailure={stage:'回應格式或生成',targetDate,completedEvents:parsed.events.length,generationMs:Date.now()-generationStarted,elapsedMs:Date.now()-started,receivedCharacters:content.length,reason:error.message,response:String(content||'').slice(0,16000)};
+          if(error.name==='FallbackTimeoutError') throw new Error(`${error.message} 請查看「AI 回應診斷」；尚未加入行事曆。`);
           throw new Error('瀏覽器 AI 未完成行程，請查看「AI 回應診斷」；尚未加入行事曆。');
         }
         if(translate) {

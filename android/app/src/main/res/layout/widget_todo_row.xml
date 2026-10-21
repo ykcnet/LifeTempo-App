@@ -1,0 +1,40 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_todo_row"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:minHeight="44dp"
+    android:orientation="horizontal">
+    <TextView
+        android:id="@+id/widget_todo_check"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:contentDescription="標記為完成"
+        android:gravity="center"
+        android:text="☐"
+        android:textColor="#6551ce"
+        android:textSize="22sp" />
+    <LinearLayout
+        android:id="@+id/widget_todo_body"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp">
+        <TextView
+            android:id="@+id/widget_todo_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:textColor="#303744"
+            android:textSize="13sp" />
+        <TextView
+            android:id="@+id/widget_todo_due"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#8A91A0"
+            android:textSize="10sp" />
+    </LinearLayout>
+</LinearLayout>
