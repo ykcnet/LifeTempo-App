@@ -101,7 +101,7 @@ test('upcoming widget selects the nearest occurrence including all-day and empty
 
 test('Android app declares installable home-screen widgets',()=>{
   assert.match(gradle,/applicationId = "com\.ykcnet\.lifetempo"/);
-  assert.match(gradle,/versionCode = 16/);
+  assert.match(gradle,/versionCode = 17/);
   assert.match(gradle,/LIFETEMPO_SIGNING_KEYSTORE/);
   assert.match(manifest,/android:allowBackup="false"/);
   assert.match(manifest,/TodayEventsWidgetProvider/);
@@ -173,6 +173,12 @@ test('resizing changes visible rows and widget taps open the matching app view',
   assert.match(read('./android/app/src/main/java/com/lifetempo/app/CalendarWidgetProvider.java'),/onAppWidgetOptionsChanged/);
   assert.match(renderer,/putExtra\("widget", todo \? "todo" : "today"\)/);
   assert.match(read('./index.html'),/widgetLaunch==='calendar'\)view='月'/);
+  assert.match(read('./index.html'),/widgetLaunch==='upcoming'\)view='週'/);
+  assert.match(renderer,/widgetView.*upcoming/);
+  assert.match(read('./android/app/src/main/res/layout/widget_today.xml'),/@\+id\/widget_settings/);
+  assert.match(renderer,/new StyleSpan\(Typeface\.BOLD\)/);
+  assert.match(read('./android/app/src/main/java/com/lifetempo/app/UpcomingWidgetSettingsActivity.java'),/NumberPicker/);
+  assert.match(read('./android/app/src/main/res/values/strings.xml'),/近日行程/);
   assert.match(read('./index.html'),/widgetLaunch==='todo'\)view='待辦'/);
   assert.match(read('./index.html'),/bridge\.updateSnapshot\(JSON\.stringify\(upcoming\),JSON\.stringify\(tasks\.filter\(task=>!task\.done\)\.slice\(0,100\)\),LocalCalendar\.settings\.weekStart,JSON\.stringify\(widgetDayInfo\(\)\)\)/);
 });

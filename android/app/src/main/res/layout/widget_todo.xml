@@ -5,22 +5,38 @@
     android:background="@drawable/widget_background"
     android:orientation="vertical"
     android:padding="14dp">
-    <TextView
-        android:id="@+id/widget_title"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:textColor="#202532"
-        android:textSize="15sp"
-        android:textStyle="bold" />
-    <TextView
-        android:id="@+id/widget_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+        <TextView
+            android:id="@+id/widget_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textColor="#202532"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+        <Button
+            android:id="@+id/widget_todo_add"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:padding="0dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="新增待辦事項"
+            android:text="＋"
+            android:textColor="#6551ce"
+            android:textSize="24sp" />
+    </LinearLayout>
+    <ListView
+        android:id="@+id/widget_todo_rows"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="4dp"
         android:layout_weight="1"
-        android:ellipsize="end"
-        android:gravity="top"
-        android:maxLines="8"
-        android:textColor="#4d5361"
-        android:textSize="12sp" />
+        android:divider="@null"
+        android:dividerHeight="0dp" />
 </LinearLayout>

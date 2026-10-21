@@ -87,8 +87,26 @@ public final class MainActivity extends Activity {
                 return true;
             }
         });
+        if (android.os.Build.VERSION.SDK_INT >= 35) {
+            // Android 15 draws edge-to-edge; keep the page clear of the status and navigation bars.
+            webView.setOnApplyWindowInsetsListener((view, insets) -> {
+                android.graphics.Insets bars = insets.getInsets(
+                        android.view.WindowInsets.Type.systemBars() | android.view.WindowInsets.Type.displayCutout());
+                view.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+                return android.view.WindowInsets.CONSUMED;
+            });
+        }
         setContentView(webView);
         loadApp(getIntent());
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Import todo edits made on the home-screen widget while the app was in the background.
+        if (pageReady && webView != null) {
+            webView.evaluateJavascript("typeof window.applyWidgetTodoOps === 'function' && window.applyWidgetTodoOps()", null);
+        }
     }
 
     @Override
@@ -143,25 +161,7 @@ public final class MainActivity extends Activity {
 
     private void loadApp(Intent intent) {
         String widget = intent == null ? null : intent.getStringExtra("widget");
-        Uri.Builder url = Uri.parse(APP_ORIGIN + "index.html").buildUpon();
-        if (widget != null) url.appendQueryParameter("widget", widget);
-        String date = intent == null ? null : intent.getStringExtra("widgetDate");
-        if (date != null && date.matches("\\d{4}-\\d{2}-\\d{2}")) url.appendQueryParameter("widgetDate", date);
-        for (String key : new String[]{"widgetEventId", "widgetRecurrence", "widgetStart"}) {
-            String value = intent == null ? null : intent.getStringExtra(key);
-            if (value != null && value.length() <= 1024) url.appendQueryParameter(key, value);
-        }
-        String destination = url.build().toString();
-        if (pageReady && widget != null) {
-            // Keep the running WebView and move directly to the destination in one render.
-            webView.evaluateJavascript("typeof window.navigateFromWidget === 'function' && window.navigateFromWidget("
-                    + org.json.JSONObject.quote(destination) + ")", result -> {
-                if (!"true".equals(result)) { pageReady = false; webView.loadUrl(destination); }
-            });
-        } else {
-            pageReady = false;
-            webView.loadUrl(destination);
-        }
+        webView.loadUrl(APP_ORIGIN + "index.html" + (widget == null ? "" : "?widget=" + Uri.encode(widget)));
     }
 
     private final class ExportBridge {

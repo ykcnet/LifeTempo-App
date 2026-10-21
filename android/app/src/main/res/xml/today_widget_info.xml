@@ -1,7 +1,7 @@
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:description="@string/today_widget_description"
     android:initialLayout="@layout/widget_today"
-    android:minHeight="80dp"
+    android:minHeight="110dp"
     android:minResizeHeight="60dp"
     android:minResizeWidth="90dp"
     android:minWidth="110dp"

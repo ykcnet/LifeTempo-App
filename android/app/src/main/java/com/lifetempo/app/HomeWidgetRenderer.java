@@ -6,9 +6,17 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
+import android.graphics.Typeface;
 import android.net.Uri;
+import android.text.SpannableString;
+import android.text.SpannableStringBuilder;
+import android.text.Spanned;
+import android.text.style.StyleSpan;
 import android.os.Bundle;
 import android.widget.RemoteViews;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import java.time.LocalDate;
@@ -194,50 +202,91 @@ final class HomeWidgetRenderer {
         if (ids == null || ids.length == 0) return;
         String json = todo ? WidgetDataStore.tasks(context) : WidgetDataStore.events(context);
         for (int id : ids) {
-            Bundle options = manager.getAppWidgetOptions(id);
-            int height = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 100);
-            int rowLimit = Math.max(1, Math.min(8, (height - 50) / 27));
             RemoteViews views = new RemoteViews(context.getPackageName(), todo ? R.layout.widget_todo : R.layout.widget_today);
-            views.setTextViewText(R.id.widget_title, todo ? "待辦事項" : "近日行程");
-            if (todo) views.setTextViewText(R.id.widget_content, content(json, true, rowLimit));
+            views.setTextViewText(R.id.widget_title, todo ? "待辦事項" : "今日行程");
+            views.setTextViewText(R.id.widget_content, content(json, todo, rowLimit));
 
             Intent open = new Intent(context, MainActivity.class)
                     .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                    .putExtra("widget", todo ? "todo" : "today");
+                    .putExtra("widget", todo ? "todo" : "today")
+                                        .putExtra("widgetView", todo ? "todo" : "upcoming");
+            if (!todo) {
+                List<JSONObject> nearest = upcoming(json, 1);
+                if (!nearest.isEmpty()) open.putExtra("widgetDate", nearest.get(0).optString("date", ""));
+            }
             PendingIntent pending = PendingIntent.getActivity(context, todo ? 2 : 1, open,
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-            if (!todo) {
-                Intent settings = new Intent(context, WidgetSettingsActivity.class)
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                        .setData(Uri.parse("lifetempo://upcoming-settings/" + id))
-                        .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id);
-                views.setOnClickPendingIntent(R.id.widget_settings, PendingIntent.getActivity(context, id, settings,
-                        PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
-                Intent template = new Intent(context, MainActivity.class)
-                        .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                        .setData(Uri.parse("lifetempo://upcoming/" + id))
-                        .putExtra("widget", "today");
-                int flags = PendingIntent.FLAG_UPDATE_CURRENT;
-                if (android.os.Build.VERSION.SDK_INT >= 31) flags |= PendingIntent.FLAG_MUTABLE;
-                views.setPendingIntentTemplate(R.id.widget_event_rows,
-                        PendingIntent.getActivity(context, id, template, flags));
-                if (android.os.Build.VERSION.SDK_INT >= 31) {
-                    RemoteViews.RemoteCollectionItems.Builder items = new RemoteViews.RemoteCollectionItems.Builder()
-                            .setViewTypeCount(1);
-                    List<JSONObject> rows = upcomingEvents(context, id);
-                    for (int i = 0; i < rows.size(); i++) items.addItem(i, upcomingRow(context, rows.get(i), i, id));
-                    views.setRemoteAdapter(R.id.widget_event_rows, items.build());
-                } else {
-                    Intent adapter = new Intent(context, UpcomingWidgetService.class)
-                            .setData(Uri.parse("lifetempo://upcoming-adapter/" + id))
-                            .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id);
-                    views.setRemoteAdapter(R.id.widget_event_rows, adapter);
-                }
-            }
-            views.setOnClickPendingIntent(todo ? R.id.widget_root : R.id.widget_title, pending);
+            views.setOnClickPendingIntent(R.id.widget_root, pending);
             manager.updateAppWidget(id, views);
-            if (!todo && android.os.Build.VERSION.SDK_INT < 31) manager.notifyAppWidgetViewDataChanged(id, R.id.widget_event_rows);
+            if (android.os.Build.VERSION.SDK_INT < 31) {
+                manager.notifyAppWidgetViewDataChanged(id, todo ? R.id.widget_todo_rows : R.id.widget_event_rows);
+            }
         }
+    }
+
+    private static void bindTodo(Context context, RemoteViews views, int id) {
+        Intent add = new Intent(context, TodoAddActivity.class)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                .setData(Uri.parse("lifetempo://todo-add/" + id))
+                .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id);
+        views.setOnClickPendingIntent(R.id.widget_todo_add, PendingIntent.getActivity(context, id, add,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
+        Intent template = new Intent(context, TodoWidgetActionActivity.class)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION)
+                .setData(Uri.parse("lifetempo://todo-action/" + id));
+        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (android.os.Build.VERSION.SDK_INT >= 31) flags |= PendingIntent.FLAG_MUTABLE;
+        views.setPendingIntentTemplate(R.id.widget_todo_rows, PendingIntent.getActivity(context, id, template, flags));
+        if (android.os.Build.VERSION.SDK_INT >= 31) {
+            RemoteViews.RemoteCollectionItems.Builder items = new RemoteViews.RemoteCollectionItems.Builder()
+                    .setViewTypeCount(1);
+            List<JSONObject> rows = todoRows(context);
+            for (int i = 0; i < rows.size(); i++) items.addItem(i, todoRow(context, rows.get(i)));
+            views.setRemoteAdapter(R.id.widget_todo_rows, items.build());
+        } else {
+            Intent adapter = new Intent(context, TodoWidgetService.class)
+                    .setData(Uri.parse("lifetempo://todo-adapter/" + id))
+                    .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id);
+            views.setRemoteAdapter(R.id.widget_todo_rows, adapter);
+        }
+    }
+
+    static List<JSONObject> todoRows(Context context) {
+        List<JSONObject> result = new ArrayList<>();
+        try {
+            JSONArray rows = new JSONArray(WidgetDataStore.tasks(context));
+            for (int i = 0; i < rows.length(); i++) {
+                JSONObject task = rows.optJSONObject(i);
+                if (task == null || task.optBoolean("done", false)) continue;
+                if (task.optString("id").isEmpty() || task.optString("title").trim().isEmpty()) continue;
+                result.add(task);
+            }
+        } catch (Exception ignored) {}
+        if (result.isEmpty()) {
+            JSONObject empty = new JSONObject();
+            try { empty.put("title", "目前沒有待辦事項"); } catch (Exception ignored) {}
+            result.add(empty);
+        }
+        return result;
+    }
+
+    static RemoteViews todoRow(Context context, JSONObject task) {
+        RemoteViews row = new RemoteViews(context.getPackageName(), R.layout.widget_todo_row);
+        String id = task.optString("id");
+        boolean real = !id.isEmpty();
+        String title = task.optString("title").trim();
+        if (real && task.optBoolean("widgetPlan", false)) title = "◷ " + title;
+        String due = task.optString("due");
+        row.setTextViewText(R.id.widget_todo_text, title);
+        row.setTextViewText(R.id.widget_todo_due, real && due.length() >= 10 ? due.substring(5, 10) : "");
+        row.setViewVisibility(R.id.widget_todo_due, real && due.length() >= 10 ? android.view.View.VISIBLE : android.view.View.GONE);
+        row.setViewVisibility(R.id.widget_todo_check, real ? android.view.View.VISIBLE : android.view.View.GONE);
+        if (real) {
+            row.setOnClickFillInIntent(R.id.widget_todo_check,
+                    new Intent().putExtra("todoAction", "toggle").putExtra("todoId", id));
+        }
+        row.setOnClickFillInIntent(R.id.widget_todo_body, new Intent().putExtra("todoAction", "open"));
+        return row;
     }
 
     static List<JSONObject> upcomingEvents(Context context, int widgetId) {
@@ -284,6 +333,61 @@ final class HomeWidgetRenderer {
                 .putExtra("widgetStart", start);
         row.setOnClickFillInIntent(R.id.widget_event_row, click);
         return row;
+    }
+
+    private static void renderUpcoming(Context context, RemoteViews views, String json, int id, int rowLimit) {
+        boolean divider = context.getSharedPreferences("lifetempo_widgets", Context.MODE_PRIVATE).getBoolean("upcomingDivider." + id, true);
+        int limit = Math.max(1, Math.min(8, context.getSharedPreferences("lifetempo_widgets", Context.MODE_PRIVATE).getInt("upcomingCount." + id, 4)));
+        List<JSONObject> items = upcoming(json, limit);
+        if (items.isEmpty()) {
+            views.setTextViewText(R.id.widget_content, "近期沒有行程");
+            return;
+        }
+        int visibleLimit = Math.max(1, Math.min(items.size(), rowLimit));
+        SpannableStringBuilder content = new SpannableStringBuilder();
+        for (int i = 0; i < visibleLimit; i++) {
+            if (i > 0) content.append(divider ? "\n────────\n" : "\n\n");
+            content.append(upcomingLabel(items.get(i)));
+        }
+        views.setTextViewText(R.id.widget_content, content);
+    }
+
+    private static List<JSONObject> upcoming(String json, int limit) {
+        List<JSONObject> visible = new ArrayList<>();
+        try {
+            JSONArray rows = new JSONArray(json);
+            LocalDate today = LocalDate.now();
+            for (int i = 0; i < rows.length(); i++) {
+                JSONObject item = rows.optJSONObject(i);
+                if (item == null || item.optString("title", "").trim().isEmpty()) continue;
+                String date = item.optString("date", "");
+                if (!date.matches("\\d{4}-\\d{2}-\\d{2}") || LocalDate.parse(date).isBefore(today)) continue;
+                visible.add(item);
+            }
+            visible.sort(Comparator.comparing(item -> item.optString("date") + "T" + item.optString("start")));
+        } catch (Exception ignored) {}
+        return visible.subList(0, Math.min(limit, visible.size()));
+    }
+
+    private static CharSequence upcomingLabel(JSONObject item) {
+        String date = item.optString("date", "");
+        String when = item.optBoolean("allDay", false) ? "全天" : widgetTime(item);
+        String prefix = date.length() >= 10 ? date.substring(5) + " " + when : when;
+        String text = prefix + "  " + item.optString("title", "").trim();
+        SpannableString styled = new SpannableString(text);
+        styled.setSpan(new StyleSpan(Typeface.BOLD), 0, prefix.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        return styled;
+    }
+
+    private static String widgetTime(JSONObject item) {
+        String start = item.optString("start", "");
+        if (!start.matches("\\d{2}:\\d{2}")) return start;
+        try {
+            ZoneId zone = ZoneId.of(item.optString("timezone", ZoneId.systemDefault().getId()));
+            LocalTime time = LocalDate.parse(item.optString("date")).atTime(LocalTime.parse(start)).atZone(zone)
+                    .withZoneSameInstant(ZoneId.systemDefault()).toLocalTime();
+            return time.format(DateTimeFormatter.ofPattern("HH:mm"));
+        } catch (Exception ignored) { return start; }
     }
 
     private static String content(String json, boolean todo, int limit) {

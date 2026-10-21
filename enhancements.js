@@ -233,8 +233,15 @@ render = function () {
     });
   };
   $('.bottom-nav')?.append(more);
+  syncTopNavHeight();
   applyAccent();
 };
+function syncTopNavHeight(){
+  const nav=document.querySelector('.bottom-nav');
+  if(!nav||!window.matchMedia?.('(max-width:650px)').matches)return;
+  document.documentElement.style.setProperty('--top-nav-h',Math.ceil(nav.getBoundingClientRect().height)+'px');
+}
+window.addEventListener('resize',syncTopNavHeight);
 function applyAccent(){const accent=localStorage.getItem('lifetempo.accent');if(/^#[a-f\d]{6}$/i.test(accent||''))document.documentElement.style.setProperty('--purple',accent);}
 
 const originalOpenModal = openModal;
@@ -561,6 +568,7 @@ window.navigateFromWidget=function(destination){
   history.replaceState(null,'',url.pathname+url.search);
   widgetLaunch=type;homeScroll=false;query='';category='全部';calendarFilter='';attendeeFilter='';
   document.documentElement.classList.add('widget-launch-pending');
+  window.applyWidgetTodoOps?.();
   try {focusUpcomingWidget();} finally {revealWidgetDestination();}
   return true;
 };
@@ -568,3 +576,41 @@ document.addEventListener('DOMContentLoaded',()=>{
   if(!['today','calendar','todo'].includes(widgetLaunch))return;
   try {focusUpcomingWidget();} finally {revealWidgetDestination();}
 },{once:true});
+
+// "+N" block in a crowded time slot lists every concurrent event; picking one opens its editor.
+function openConcurrentEvents(more){
+  const items=[...document.querySelectorAll(`[data-more-group="${more.dataset.moreGroup}"][data-edit]`)];
+  if(!items.length)return;
+  root.insertAdjacentHTML('beforeend',`<div class="modal-wrap" id="moreWrap"><section class="modal"><h2>同時段行程</h2>${items.map((el,i)=>`<button type="button" class="tool-row" data-more-pick="${i}" style="display:block;width:100%;text-align:left;margin-bottom:8px">${esc(el.querySelector('b')?.textContent||'')}<small style="display:block">${esc(el.querySelector('small')?.textContent||'')}</small></button>`).join('')}<div class="modal-actions"><button type="button" class="cancel" id="moreClose">關閉</button></div></section></div>`);
+  const wrap=document.getElementById('moreWrap');
+  wrap.onclick=event=>{if(event.target===wrap)wrap.remove()};
+  wrap.querySelector('#moreClose').onclick=()=>wrap.remove();
+  wrap.querySelectorAll('[data-more-pick]').forEach(button=>button.onclick=()=>{wrap.remove();items[Number(button.dataset.morePick)].click()});
+}
+document.addEventListener('click',event=>{const more=event.target.closest('.event-more');if(more)openConcurrentEvents(more)});
+document.addEventListener('keydown',event=>{if(event.key!=='Enter'&&event.key!==' ')return;const more=event.target.closest?.('.event-more');if(more){event.preventDefault();openConcurrentEvents(more)}});
+
+// Todo edits made on the Android home-screen widget are queued natively and imported here.
+window.applyWidgetTodoOps=function(){
+  if(typeof window.LifeTempoWidget?.takeTodoOps!=='function')return;
+  let ops;try{ops=JSON.parse(window.LifeTempoWidget.takeTodoOps()||'[]')}catch{return}
+  if(!Array.isArray(ops)||!ops.length)return;
+  let changed=false;const planned=[];
+  for(const op of ops){
+    if(!op||typeof op.id!=='string')continue;
+    if(op.type==='done'){
+      const task=tasks.find(item=>item.id===op.id);
+      if(task&&!task.done){task.done=true;changed=true}
+    }else if(op.type==='add'&&typeof op.title==='string'&&op.title.trim()&&!tasks.some(item=>item.id===op.id)){
+      tasks.push({id:op.id,title:op.title.trim().slice(0,200),due:/^\d{4}-\d{2}-\d{2}$/.test(op.due||'')?op.due:iso(new Date()),done:false});
+      changed=true;if(op.mode==='plan')planned.push(op.id);
+    }
+  }
+  if(!changed)return;
+  saveTasks();
+  for(const id of planned){if(!tasks.find(item=>item.id===id)?.done)scheduleTask(id,{navigate:false})}
+  render();
+};
+window.applyWidgetTodoOps();
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)window.applyWidgetTodoOps()});
+window.addEventListener('focus',()=>window.applyWidgetTodoOps());
