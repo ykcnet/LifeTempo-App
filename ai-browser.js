@@ -68,8 +68,8 @@
           requestData.category={工作:'work',個人:'personal',家庭:'family',健康:'health',旅遊:'travel',其他:'other'}[body.category]||'';
         }
         const rules=translate
-          ? 'Plan ONLY the target date in this trip, in English. Return concise JSON: title,date,start,end; place/category if useful. Omit summary/notes unless necessary. Every timed event must have a positive, realistic duration; end must be later than start. Never use identical start and end times. Estimate a positive duration for transport and mark schedules as unverified. endDate only for overnight events; allDay only for truly untimed events (exclusive endDate). For an evening event ending before 06:00, set endDate to the next day. Preserve requested times, split morning/afternoon, avoid overlaps, allow travel/rest. Use specific nearby places, avoid repeating earlier days. Include outbound transport on first day and return on last day as requested. Never invent train numbers or verified schedules; mark estimates. Only return events:[] with a specific error when essential details such as destination or dates are missing. If details are sufficient, create the itinerary; unverified schedules or opening hours are not a reason to return an error.'
-          : '只規劃指定日期，輸出繁體中文 JSON：title,date,start,end，必要時才加 place/category。省略長摘要及備註。同日不用 endDate；跨日須填。每筆有時間的行程必須安排大於零且合理的時長，結束時間必須晚於開始時間，不可使用相同的開始與結束時間。交通行程需估計合理車程，班次及估計時間註明待確認。晚間開始且清晨（06:00 前）結束的行程，endDate 填次日。真正無時段的全天事項才用 allDay，endDate 不含最後一天。保留指定時間，上午下午分開，避開重疊並預留交通休息。旅遊選具體且順路的地點，勿重複前日活動，依需求首日去程、末日回程。不得捏造班次，建議時間需註明待確認。僅在缺少目的地或日期等必要資訊、確實無法安排時才回傳 events:[] 與具體 error；資訊足夠時必須提出行程，不可只因班次、營業時間或票價未確認而回傳 error。';
+          ? 'Plan ONLY the target date in this trip, in English. Return concise JSON: title,date,start,end; place/category if useful. Omit summary/notes unless necessary. Every timed event must have a positive, realistic duration; end must be later than start. Never use identical start and end times. Estimate a positive duration for transport and mark schedules as unverified. For transport or departure starting at 23:00 and ending after midnight, set endDate to the next day and end to a later time such as 00:30; never copy the start time into end. endDate only for overnight events; allDay only for truly untimed events (exclusive endDate). For an evening event ending before 06:00, set endDate to the next day. Preserve requested times, split morning/afternoon, avoid overlaps, allow travel/rest. Use specific nearby places, avoid repeating earlier days. Include outbound transport on first day and return on last day as requested. Never invent train numbers or verified schedules; mark estimates. Only return events:[] with a specific error when essential details such as destination or dates are missing. If details are sufficient, create the itinerary; unverified schedules or opening hours are not a reason to return an error.'
+          : '只規劃指定日期，輸出繁體中文 JSON：title,date,start,end，必要時才加 place/category。省略長摘要及備註。同日不用 endDate；跨日須填。每筆有時間的行程必須安排大於零且合理的時長，結束時間必須晚於開始時間，不可使用相同的開始與結束時間。交通行程需估計合理車程，班次及估計時間註明待確認。若交通或離開行程於 23:00 開始並跨午夜，請填次日 endDate 與較晚的 end（例如 00:30），不可將開始時間複製為結束時間。晚間開始且清晨（06:00 前）結束的行程，endDate 填次日。真正無時段的全天事項才用 allDay，endDate 不含最後一天。保留指定時間，上午下午分開，避開重疊並預留交通休息。旅遊選具體且順路的地點，勿重複前日活動，依需求首日去程、末日回程。不得捏造班次，建議時間需註明待確認。僅在缺少目的地或日期等必要資訊、確實無法安排時才回傳 events:[] 與具體 error；資訊足夠時必須提出行程，不可只因班次、營業時間或票價未確認而回傳 error。';
         const days=[];
         const validDate=value=>/^\d{4}-\d{2}-\d{2}$/.test(value||'')&&Number.isFinite(Date.parse(value+'T00:00Z'))&&new Date(value+'T00:00Z').toISOString().slice(0,10)===value;
         const incompleteModelError=value=>/^(?:\d{4}-\d{2}-\d{2}\s*)?(?:(?:開始日期|結束日期|日期|開始時間|結束時間|時間|地點|行程|events|error)\s*){1,3}$/i.test(value);
@@ -126,9 +126,11 @@
                   : '';
                 const instruction=rules+'\n'+dayTravelRule+'\n'+dayPosition+'\n'+retryGuidance+'\n'+correction+'\n'+dayRequest;
                 if(session.promptStreaming) {
-                  for await(const chunk of session.promptStreaming(instruction,promptOptions)) {content+=chunk;progress();}
-                  if(!content.trim()&&session.prompt) {
-                    report(`第 ${index+1} 天串流沒有回應，改用一般生成重試…`);
+                  let streamError=null;
+                  try { for await(const chunk of session.promptStreaming(instruction,promptOptions)) {content+=chunk;progress();} }
+                  catch(error) {if(signal?.aborted)throw error;streamError=error;}
+                  if((!content.trim()||streamError)&&session.prompt) {
+                    report(`第 ${index+1} 天串流${streamError?'中斷':'未傳回內容'}，正在改用一般生成…`);
                     let timeoutId;
                     const timeoutController=new AbortController();
                     const fallbackSignal=signal?AbortSignal.any([signal,timeoutController.signal]):timeoutController.signal;
