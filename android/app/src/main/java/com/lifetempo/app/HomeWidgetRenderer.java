@@ -204,7 +204,8 @@ final class HomeWidgetRenderer {
         for (int id : ids) {
             RemoteViews views = new RemoteViews(context.getPackageName(), todo ? R.layout.widget_todo : R.layout.widget_today);
             views.setTextViewText(R.id.widget_title, todo ? "待辦事項" : "今日行程");
-            views.setTextViewText(R.id.widget_content, content(json, todo, rowLimit));
+            if (todo) bindTodo(context, views, id);
+            else views.setTextViewText(R.id.widget_content, content(json, false, 8));
 
             Intent open = new Intent(context, MainActivity.class)
                     .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP)
@@ -218,9 +219,7 @@ final class HomeWidgetRenderer {
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
             views.setOnClickPendingIntent(R.id.widget_root, pending);
             manager.updateAppWidget(id, views);
-            if (android.os.Build.VERSION.SDK_INT < 31) {
-                manager.notifyAppWidgetViewDataChanged(id, todo ? R.id.widget_todo_rows : R.id.widget_event_rows);
-            }
+            if (todo && android.os.Build.VERSION.SDK_INT < 31) manager.notifyAppWidgetViewDataChanged(id, R.id.widget_todo_rows);
         }
     }
 

@@ -274,7 +274,8 @@ globalThis.AIPlanner={generatePlan,parseResponse};
 
 (function () {
   const textField={type:'string',maxLength:80};
-  const fallbackPromptTimeoutMs=60000;
+  const streamFirstResponseTimeoutMs=30000;
+  const fallbackPromptTimeoutMs=20000;
   const schema={type:'object',properties:{
     summary:textField,error:textField,events:{type:'array',items:{type:'object',properties:{
       title:{type:'string',minLength:1,maxLength:80},
@@ -401,8 +402,14 @@ globalThis.AIPlanner={generatePlan,parseResponse};
                 const instruction=rules+'\n'+dayTravelRule+'\n'+dayPosition+'\n'+retryGuidance+'\n'+correction+'\n'+dayRequest;
                 if(session.promptStreaming) {
                   let streamError=null;
-                  try { for await(const chunk of session.promptStreaming(instruction,promptOptions)) {content+=chunk;progress();} }
-                  catch(error) {if(signal?.aborted)throw error;streamError=error;}
+                  const streamController=new AbortController();
+                  const streamSignal=signal?AbortSignal.any([signal,streamController.signal]):streamController.signal;
+                  let streamTimeoutId;
+                  const streamTimeout=new Promise((_,reject)=>{streamTimeoutId=setTimeout(()=>{streamController.abort();const error=new Error(`第 ${index+1} 天串流在 ${streamFirstResponseTimeoutMs/1000} 秒內沒有回應`);error.name='StreamNoResponseError';reject(error);},streamFirstResponseTimeoutMs);});
+                  try {
+                    await Promise.race([(async()=>{for await(const chunk of session.promptStreaming(instruction,{...promptOptions,signal:streamSignal})){clearTimeout(streamTimeoutId);content+=chunk;progress();}})(),streamTimeout]);
+                  } catch(error) {if(signal?.aborted)throw error;streamError=error;}
+                  finally {clearTimeout(streamTimeoutId);}
                   if((!content.trim()||streamError)&&session.prompt) {
                     report(`第 ${index+1} 天串流${streamError?'中斷':'未傳回內容'}，正在改用一般生成…`);
                     let timeoutId;
@@ -430,7 +437,7 @@ globalThis.AIPlanner={generatePlan,parseResponse};
                     }
                   }
                 } else content=await session.prompt(instruction,promptOptions);
-                if(!String(content||'').trim()) throw new Error('瀏覽器內建 AI 串流與一般生成皆未回傳內容');
+                if(!String(content||'').trim()) {const error=new Error('瀏覽器內建 AI 串流與一般生成皆未回傳內容');error.name='EmptyAIResponseError';throw error;}
                 dayPlan=AIPlanner.parseResponse(content);
                 if(dayPlan.error) {
                   const modelError=String(dayPlan.error).trim();
@@ -457,7 +464,7 @@ globalThis.AIPlanner={generatePlan,parseResponse};
                 }
                 break;
               } catch(attemptError) {
-                if(signal?.aborted||attempt===3||attemptError.name==='FallbackTimeoutError') throw attemptError;
+                if(signal?.aborted||attempt===3||attemptError.name==='FallbackTimeoutError'||attemptError.name==='EmptyAIResponseError') throw attemptError;
                 report(`第 ${index+1} 天回應不完整，正在重試（${attempt+1}/3）…`);
               } finally {
                 clearInterval(waiting);
@@ -471,6 +478,7 @@ globalThis.AIPlanner={generatePlan,parseResponse};
           if(signal?.aborted) throw new Error('已取消規劃，未加入任何行程。');
           BrowserAI.lastFailure={stage:'回應格式或生成',targetDate,completedEvents:parsed.events.length,generationMs:Date.now()-generationStarted,elapsedMs:Date.now()-started,receivedCharacters:content.length,reason:error.message,response:String(content||'').slice(0,16000)};
           if(error.name==='FallbackTimeoutError') throw new Error(`${error.message} 請查看「AI 回應診斷」；尚未加入行事曆。`);
+          if(error.name==='EmptyAIResponseError') throw new Error('瀏覽器內建 AI 串流與一般生成都沒有回傳內容，已停止重試避免久候。請稍後再試，或到「行事曆設定」改用其他 AI 服務；診斷資訊已保留。');
           throw new Error('瀏覽器 AI 未完成行程，請查看「AI 回應診斷」；尚未加入行事曆。');
         }
         if(translate) {

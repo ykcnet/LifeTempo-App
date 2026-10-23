@@ -225,8 +225,9 @@ render = function () {
   }
   const more=document.createElement('button');more.textContent='☰ 更多';
   more.onclick=()=>{
-    openFormModal('工作區',`<div class="field full"><label>前往功能</label><select name="destination"><option value="週">日曆首頁</option><option value="待辦">待辦事項</option><option value="預約">空檔預約</option><option value="共享行事曆">共享行事曆</option><option value="共享">管理共享與權限</option><option value="設定">行事曆設定</option><option value="manage-categories">管理分類</option></select></div><div class="field full"><label>我的分類</label><select name="category"><option value="全部">所有行程</option>${Object.keys(COLORS).map(name=>`<option value="${esc(name)}">${esc(name)}</option>`).join('')}</select></div>`,'開啟',fd=>{
+    openFormModal('工作區',`<div class="field full"><label>前往功能</label><select name="destination"><option value="週">日曆首頁</option><option value="待辦">待辦事項</option><option value="預約">空檔預約</option><option value="共享行事曆">共享行事曆</option><option value="共享">管理共享與權限</option><option value="設定">行事曆設定</option><option value="ai-import">AI 行程匯入</option><option value="manage-categories">管理分類</option></select></div><div class="field full"><label>我的分類</label><select name="category"><option value="全部">所有行程</option>${Object.keys(COLORS).map(name=>`<option value="${esc(name)}">${esc(name)}</option>`).join('')}</select></div>`,'開啟',fd=>{
       const destination=fd.get('destination');
+      if(destination==='ai-import'){$('#actionWrap')?.remove();openAIImport();return false;}
       if(destination==='manage-categories'){$('#actionWrap')?.remove();manageCategories();return false;}
       category=fd.get('category')||'全部';calendarFilter='';
       navigatePageView(destination);
@@ -499,10 +500,6 @@ const renderBeforeCalendarImport=render;
 render=function(){
   renderBeforeCalendarImport();
   if($('#import'))$('#import').onclick=openCalendarImport;
-  if(isMobileExperience()&&$('#aiPlanBtn')){
-    $('#aiPlanBtn').textContent='匯入桌面版 AI 規劃';
-    $('#aiPlanBtn').onclick=()=>openCalendarImport({desktopAI:true});
-  }
   const bar=$('#clearCalendarFilter')?.parentElement;
   if(bar&&(!calendarFilter||calendarFilter==='personal')){
     const button=document.createElement('button');button.textContent='匯入其他行事曆';button.onclick=openCalendarImport;bar.append(button);
