@@ -393,8 +393,8 @@ function saveTasks(){localStorage.setItem('lifetempo.tasks',JSON.stringify(tasks
 function syncAndroidWidgets(){
   const bridge=window.LifeTempoWidget;if(typeof bridge?.updateSnapshot!=='function')return;
   try{
-    const start=new Date(today.getFullYear(),today.getMonth(),1),end=new Date(today);end.setDate(end.getDate()+30);
-    const upcoming=expandEvents(start,end).slice(0,120).map(event=>({title:event.title,date:event.displayDate||event.occurrence||event.date,start:event.start||'',allDay:!!event.allDay,color:color(event)}));
+    const start=new Date(today.getFullYear(),today.getMonth(),1),end=new Date(start);end.setFullYear(end.getFullYear()+2);end.setDate(end.getDate()-1);
+    const upcoming=expandEvents(start,end).map(event=>({title:event.title,date:event.displayDate||event.occurrence||event.date,start:event.start||'',allDay:!!event.allDay,color:color(event)}));
     bridge.updateSnapshot(JSON.stringify(upcoming),JSON.stringify(tasks.filter(task=>!task.done).slice(0,100)),LocalCalendar.settings.weekStart);
   }catch{}
 }
