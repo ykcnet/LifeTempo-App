@@ -4,12 +4,14 @@ import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.IntentSender;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
 import android.widget.Toast;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
+import android.webkit.PermissionRequest;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebView;
 import androidx.webkit.WebViewAssetLoader;
@@ -22,12 +24,14 @@ import com.google.android.gms.common.api.Scope;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
+import java.util.Arrays;
 
 public final class MainActivity extends Activity {
     private static final String APP_ORIGIN = "https://appassets.androidplatform.net/";
     private static final int FILE_CHOOSER_REQUEST = 4201;
     private static final int EXPORT_FILE_REQUEST = 4202;
     private static final int DRIVE_AUTH_REQUEST = 4203;
+    private static final int AUDIO_PERMISSION_REQUEST = 4204;
     private static final String DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.appdata";
     private static final String DRIVE_AUTH_TAG = "LifeTempoDriveAuth";
     private WebView webView;
@@ -35,6 +39,7 @@ public final class MainActivity extends Activity {
     private ValueCallback<Uri[]> fileChooserCallback;
     private String pendingExportContent;
     private String pendingDriveRequestId;
+    private PermissionRequest pendingWebPermissionRequest;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -46,6 +51,19 @@ public final class MainActivity extends Activity {
         webView.addJavascriptInterface(new ExportBridge(), "LifeTempoFiles");
         webView.addJavascriptInterface(new DriveAuthBridge(), "LifeTempoDriveNative");
         webView.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public void onPermissionRequest(PermissionRequest request) {
+                runOnUiThread(() -> {
+                    if (!APP_ORIGIN.equals(request.getOrigin().toString())) { request.deny(); return; }
+                    if (!Arrays.asList(request.getResources()).contains(PermissionRequest.RESOURCE_AUDIO_CAPTURE)) { request.deny(); return; }
+                    if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                        request.grant(new String[]{PermissionRequest.RESOURCE_AUDIO_CAPTURE});
+                    } else {
+                        pendingWebPermissionRequest = request;
+                        requestPermissions(new String[]{android.Manifest.permission.RECORD_AUDIO}, AUDIO_PERMISSION_REQUEST);
+                    }
+                });
+            }
             @Override
             public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
                 if (fileChooserCallback != null) fileChooserCallback.onReceiveValue(null);
@@ -98,6 +116,18 @@ public final class MainActivity extends Activity {
         }
         setContentView(webView);
         loadApp(getIntent());
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != AUDIO_PERMISSION_REQUEST) return;
+        PermissionRequest request = pendingWebPermissionRequest;
+        pendingWebPermissionRequest = null;
+        if (request == null) return;
+        if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            request.grant(new String[]{PermissionRequest.RESOURCE_AUDIO_CAPTURE});
+        } else request.deny();
     }
 
     @Override
