@@ -1,6 +1,6 @@
-const CACHE = 'lifetempo-shell-v12';
+const CACHE = 'lifetempo-shell-v13';
 const BASE_URL = new URL('./', self.location.href);
-const SHELL = ['./', 'index.html', 'calendar-core.js', 'vendor/ical.js', 'calendar-ics.js', 'ai-request.js', 'booking-client.js', 'enhancements.js', 'localization-data.js', 'localization-core.js', 'localization-client.js', 'localization.css', 'manifest.webmanifest', 'LifeTempo-Icons/source/LifeTempo-rounded.svg', 'LifeTempo-Icons/android/play-store-512.png'].map(path => new URL(path, BASE_URL).href);
+const SHELL = ['./', 'index.html', 'speech-session.js','calendar-core.js', 'vendor/ical.js', 'calendar-ics.js', 'ai-request.js', 'booking-client.js', 'enhancements.js', 'localization-data.js', 'localization-core.js', 'localization-client.js', 'localization.css', 'manifest.webmanifest', 'LifeTempo-Icons/source/LifeTempo-rounded.svg', 'LifeTempo-Icons/android/play-store-512.png'].map(path => new URL(path, BASE_URL).href);
 SHELL.push(...['drive-config.js','drive-sync-core.js','drive-sync.js'].map(path=>new URL(path,BASE_URL).href));
 const SHELL_PATHS = new Set(SHELL.map(path => new URL(path).pathname));
 self.addEventListener('install', event => event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(SHELL))));

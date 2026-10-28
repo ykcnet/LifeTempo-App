@@ -81,5 +81,15 @@
       }
     };
   }
-  root.LifeTempoSpeech={wrap,merge};
+  function errorMessage(error) {
+    const messages={
+      'not-allowed':'麥克風權限被拒絕，請在 Edge 的網站權限及 Windows 隱私權設定允許麥克風。',
+      'service-not-allowed':'此環境不允許語音辨識服務，請檢查瀏覽器設定。',
+      'audio-capture':'無法取得麥克風，請檢查輸入裝置與麥克風權限。',
+      'network':'無法連線到語音辨識服務，請檢查網路後重試。',
+      'language-not-supported':'語音服務不支援目前的辨識語言。'
+    };
+    return (messages[error]||'語音辨識未完成，請重試。')+' Windows 也可點選文字欄後按 Win + H 輸入。';
+  }
+  root.LifeTempoSpeech={wrap,merge,errorMessage};
 })(globalThis);
