@@ -137,11 +137,6 @@ ${prompt}
       if(e.end==='24:00'&&validPlanDate(endDate)){endDate=nextDate(endDate);e.end='00:00';}
       if(!timeRe.test(e.start)) return invalid('開始時間',raw.start);
       if(!timeRe.test(e.end)) return invalid('結束時間',raw.end);
-      // Departure and transport events at 23:00 are often returned with a
-      // zero-length end time. Treat that specific late-night case as an
-      // overnight trip when the model omitted a useful end time.
-      if(!e.allDay&&e.end===e.start&&e.start==='23:00'&&!clean(raw.endDate)&&/(離開|出發|搭乘|搭車|高鐵|火車|航班|前往|返程|回程)/.test(clean(e.title))){e.end='00:00';endDate=nextDate(e.date);}
-      if(!e.allDay&&!clean(e.endDate)&&e.end<e.start&&Number(e.start.slice(0,2))>=18&&Number(e.end.slice(0,2))<6) endDate=nextDate(e.date);
       if(!validPlanDate(endDate)) return invalid('結束日期',raw.endDate);
       if(e.allDay?endDate<=e.date:endDate+'T'+e.end<=e.date+'T'+e.start) return {error:`AI 第 ${index+1} 筆行程「${clean(e.title).slice(0,60)}」結束時間必須晚於開始（${e.date} ${e.start} → ${endDate} ${e.end}）；跨日行程需提供結束日期，請重新規劃。`,events:[]};
       events.push({
