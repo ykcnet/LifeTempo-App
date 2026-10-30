@@ -11,3 +11,6 @@ android-apk-kit/cache/
 android-apk-kit/output/
 android/
 *.7z
+Build-Apk.ps1
+Import-LifeTempoKey.ps1
+Install-Toolchain.ps1
