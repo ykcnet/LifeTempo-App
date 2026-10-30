@@ -203,7 +203,7 @@ final class HomeWidgetRenderer {
         String json = todo ? WidgetDataStore.tasks(context) : WidgetDataStore.events(context);
         for (int id : ids) {
             RemoteViews views = new RemoteViews(context.getPackageName(), todo ? R.layout.widget_todo : R.layout.widget_today);
-            views.setTextViewText(R.id.widget_title, todo ? "待辦事項" : "今日行程");
+            views.setTextViewText(R.id.widget_title, todo ? "待辦事項" : "近日行程");
             if (todo) bindTodo(context, views, id);
             else views.setTextViewText(R.id.widget_content, content(json, false, 8));
 
