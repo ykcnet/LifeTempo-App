@@ -15,8 +15,8 @@ Build-Apk.ps1
 Import-LifeTempoKey.ps1
 Install-Toolchain.ps1
 
-# local autostart + logs
-autostart.ps1
+# local logs + machine-specific config
 autostart.log
 ngrok.*.log
 server.*.log
+ngrok-url.txt
