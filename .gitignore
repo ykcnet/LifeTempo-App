@@ -14,3 +14,9 @@ android/
 Build-Apk.ps1
 Import-LifeTempoKey.ps1
 Install-Toolchain.ps1
+
+# local autostart + logs
+autostart.ps1
+autostart.log
+ngrok.*.log
+server.*.log

@@ -77,7 +77,7 @@ const server = http.createServer(async (req, res) => {
   if (nativeApiMethods[url.pathname] && req.headers.origin === androidAppOrigin) {
     res.setHeader('Access-Control-Allow-Origin', androidAppOrigin);
     res.setHeader('Access-Control-Allow-Methods', nativeApiMethods[url.pathname]);
-    res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+    res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, ngrok-skip-browser-warning');
     res.setHeader('Vary', 'Origin');
     if (req.method === 'OPTIONS') return res.writeHead(204).end();
   }
