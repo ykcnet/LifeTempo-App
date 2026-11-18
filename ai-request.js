@@ -179,7 +179,8 @@ ${prompt}
       return `${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}`;
     };
     if(!Array.isArray(parsed.events)) return {error:'AI 回應缺少行程清單，請重新規劃。',events:[]};
-    for (const [index, raw] of parsed.events.entries()) {
+    const planEndDate = endDate;
+for (const [index, raw] of parsed.events.entries()) {
       const e={...raw};
       const invalid=(field,value)=>({error:`AI 第 ${index+1} 筆行程「${clean(e.title).slice(0,60)||'未命名'}」包含無效日期或時間：${field}「${clean(value).slice(0,80)||'未提供'}」。請補上明確日期與起訖時間後重新規劃。`,events:[]});
       if(!clean(e.title)) return invalid('行程名稱',e.title);
@@ -195,6 +196,7 @@ ${prompt}
       if(!timeRe.test(e.start)) return invalid('開始時間',raw.start);
       if(!timeRe.test(e.end)) return invalid('結束時間',raw.end);
       if(!validPlanDate(endDate)) return invalid('結束日期',raw.endDate);
+if(!clean(e.endDate)&&!e.allDay&&timeRe.test(e.start)&&timeRe.test(e.end)&&e.end<e.start&&planEndDate&&nextDate(e.date)<=planEndDate) endDate=nextDate(e.date);
       if(e.allDay?endDate<=e.date:endDate+'T'+e.end<=e.date+'T'+e.start) return {error:`AI 第 ${index+1} 筆行程「${clean(e.title).slice(0,60)}」結束時間必須晚於開始（${e.date} ${e.start} → ${endDate} ${e.end}）；跨日行程需提供結束日期，請重新規劃。`,events:[]};
       events.push({
         id: `ai-${Date.now()}-${events.length}`,

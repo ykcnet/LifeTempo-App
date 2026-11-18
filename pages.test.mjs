@@ -20,8 +20,8 @@ test('Pages build emits only the allowlisted static PWA files',()=>{
 
 test('mobile keeps the AI planner entry and calendar navigation controls',()=>{
   const html=read('index.html');
-  assert.match(html,/@media\(min-width:651px\)\{#aiPlanBtn\{display:none!important\}\}/);
-  assert.match(html,/id="aiPlanNav"/);
+  assert.match(html,/@media\(min-width:651px\)\{#aiPlanBtn,#aiPlanNav,#aiSettingsSection\{display:none!important\}/);
+  assert.match(html,/id="aiPlanBtn"/);
   assert.match(html,/id="prev"/);
   assert.match(html,/id="today"/);
   assert.match(html,/id="next"/);
@@ -36,21 +36,24 @@ test('desktop hides bottom navigation while phone navigation remains fixed',()=>
 test('phone AI button imports a desktop plan while desktop keeps its AI planner',()=>{
   const html=read('index.html'),enhancements=read('enhancements.js');
   assert.match(html,/if\(\$\('#aiPlanBtn'\)\)\$\('#aiPlanBtn'\)\.onclick=openAIPlan/);
-  assert.match(enhancements,/if\(isMobileExperience\(\)&&\$\('#aiPlanBtn'\)\)/);
-  assert.match(enhancements,/textContent='匯入桌面版 AI 規劃'/);
-  assert.match(enhancements,/onclick=\(\)=>openCalendarImport\(\{desktopAI:true\}\)/);
+  assert.match(html,/@media\(min-width:651px\)\{[\s\S]*?#aiImportNav\{display:flex!important\}/);
+  assert.match(enhancements,/'匯入桌面版 AI 規劃'/);
+  assert.match(enhancements,/const desktopAI=options\.desktopAI===true/);
   assert.match(enhancements,/if\(desktopAI\)panel\.querySelector\('#wizardFile'\)\?\.click\(\)/);
 });
 
 test('mobile today/calendar/month navigation clears search and lands on the selected view',()=>{
   const source=read('enhancements.js'),start=source.indexOf('function prepareBottomNavigation('),end=source.indexOf('\n}',start)+2;
-  const context=vm.createContext({query:'台南',today:new Date('2026-10-15T00:00:00Z'),cursor:new Date('2026-10-01T00:00:00Z')});
+  const iso=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const parse=value=>new Date(value+'T00:00:00');
+  const context=vm.createContext({query:'台南',today:new Date('2026-10-15T00:00:00Z'),cursor:new Date('2026-10-01T00:00:00Z'),iso,parse});
   vm.runInContext(source.slice(start,end),context);
+  const todayIso=iso(new Date());
   for(const view of ['日','週','月']){
     context.query='台南';context.cursor=new Date('2026-10-01T00:00:00Z');
     vm.runInContext(`prepareBottomNavigation('${view}')`,context);
     assert.equal(context.query,'');
-    assert.equal(context.cursor.toISOString().slice(0,10),view==='日'?'2026-10-15':'2026-10-01');
+    assert.equal(iso(context.cursor),view==='日'?todayIso:'2026-10-01');
   }
   for(const selector of ['.bottom-nav [data-goview]','.nav [data-goview]','.view-switch [data-view]','.sidebar [data-mini]','#today','#prev','#next','#pageHome','#pagePrevious','#pageNext']) assert.ok(source.includes(selector),selector);
   assert.match(source,/button\.matches\('\.bottom-nav \[data-goview\]'\)\) prepareBottomNavigation\(nextView\)/);
@@ -59,9 +62,9 @@ test('mobile today/calendar/month navigation clears search and lands on the sele
 
 test('mobile and desktop navigation scrolls the new view into the screen',()=>{
   const source=read('enhancements.js'),start=source.indexOf('function scrollNavigationToTop('),end=source.indexOf('\n}',start)+2;
-  const calls=[],context=vm.createContext({window:{scrollTo:options=>calls.push(['window',options])},document:{querySelector:()=>({scrollTo:options=>calls.push(['main',options])})},requestAnimationFrame:callback=>callback()});
+  const calls=[],context=vm.createContext({window:{scrollTo:options=>calls.push(['window',options])},document:{querySelector:()=>({scrollTo:options=>calls.push(['main',options])})},requestAnimationFrame:callback=>callback(),scheduleCalendarScroll:callback=>callback()});
   vm.runInContext(source.slice(start,end)+';scrollNavigationToTop()',context);
-  assert.deepEqual(JSON.parse(JSON.stringify(calls)),[['window',{top:0,behavior:'smooth'}],['main',{top:0,behavior:'smooth'}]]);
+  assert.deepEqual(JSON.parse(JSON.stringify(calls)),[['window',{top:0,behavior:'instant'}],['main',{top:0,behavior:'instant'}]]);
   assert.match(source,/\.view-switch \[data-view\],\.sidebar \[data-mini\].*#today,#prev,#next,#pageHome,#pagePrevious,#pageNext/);
   assert.match(source,/button\.matches\('\.bottom-nav \[data-goview\]'\)\) prepareBottomNavigation\(nextView\)/);
   assert.match(source,/const previousView=lastRenderedView/);
@@ -84,7 +87,7 @@ test('mobile workspace menu exposes full feature names and category controls',()
 test('mobile hides AI settings only on phones and shared management actions remain visible',()=>{
   const enhancements=read('enhancements.js'),styles=read('localization.css'),html=read('index.html');
   const mobileCheck=enhancements.indexOf('const isMobileExperience');
-  const settingsCheck=enhancements.indexOf("if(view==='設定') {\n    if(isMobileExperience())");
+  const settingsCheck=Math.max(enhancements.indexOf("if(view==='設定') {\n    if(isMobileExperience())"),enhancements.indexOf("if(view==='設定') {\r\n    if(isMobileExperience())"));
   assert.ok(mobileCheck>=0&&settingsCheck>mobileCheck);
   assert.match(enhancements,/if\(view==='設定'\) \{\s*if\(isMobileExperience\(\)\)\{\s*const aiHeading=/);
   assert.match(enhancements,/heading\.textContent\.trim\(\)==='AI 設定'/);
