@@ -20,6 +20,18 @@ const root = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = process.env.LIFETEMPO_DATA_DIR || path.join(root, 'data');
 fs.mkdirSync(dataDir, { recursive: true });
 const db = new DatabaseSync(path.join(dataDir, 'lifetempo.sqlite'));
+
+// 每次寫入前保留舊版快照（最多 10 份），誤覆蓋時可還原
+const syncBackupDir = path.join(dataDir, 'calendar-sync-backups');
+function backupCalendarSync(stateText, revision) {
+  try {
+    fs.mkdirSync(syncBackupDir, { recursive: true });
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    fs.writeFileSync(path.join(syncBackupDir, `state-${stamp}-r${revision}.json`), stateText);
+    const files = fs.readdirSync(syncBackupDir).filter((f) => f.startsWith('state-')).sort();
+    while (files.length > 10) fs.unlinkSync(path.join(syncBackupDir, files.shift()));
+  } catch {}
+}
 db.exec(`
   PRAGMA journal_mode = WAL;
   PRAGMA foreign_keys = ON;
@@ -77,7 +89,7 @@ const server = http.createServer(async (req, res) => {
   if (nativeApiMethods[url.pathname] && req.headers.origin === androidAppOrigin) {
     res.setHeader('Access-Control-Allow-Origin', androidAppOrigin);
     res.setHeader('Access-Control-Allow-Methods', nativeApiMethods[url.pathname]);
-    res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+    res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, ngrok-skip-browser-warning');
     res.setHeader('Vary', 'Origin');
     if (req.method === 'OPTIONS') return res.writeHead(204).end();
   }
@@ -177,6 +189,7 @@ const server = http.createServer(async (req, res) => {
             return json(res, 409, { error: '伺服器資料已更新', revision: currentRevision, state: current ? JSON.parse(current.state) : null, updatedAt: current?.updated_at || null });
           }
           const revision = currentRevision + 1, updatedAt = new Date().toISOString();
+          if (current?.state) backupCalendarSync(current.state, currentRevision);
           db.prepare(`INSERT INTO calendar_sync(id,revision,state,updated_at) VALUES(1,?,?,?)
             ON CONFLICT(id) DO UPDATE SET revision=excluded.revision,state=excluded.state,updated_at=excluded.updated_at`)
             .run(revision, JSON.stringify(body.state), updatedAt);
