@@ -20,3 +20,8 @@ autostart.log
 ngrok.*.log
 server.*.log
 ngrok-url.txt
+
+secrets/
+*.env
+*.vc
+secrets.7z
